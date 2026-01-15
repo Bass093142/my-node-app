@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ✅ เพิ่มส่วนนี้: กำหนดคลาสสำหรับฟอนต์ภาษาไทย */
+@layer utilities {
+  .font-sarabun {
+    font-family: 'Sarabun', sans-serif;
+  }
+}
+
+/* (ทางเลือก) ถ้าอยากให้ทั้งเว็บเป็นฟอนต์ Sarabun ให้แก้ตรงนี้ */
+/* body {
+  font-family: 'Sarabun', sans-serif;
+} */
