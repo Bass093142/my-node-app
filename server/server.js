@@ -8,28 +8,31 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================================
-// 1. เชื่อมต่อ Database (แก้ชื่อตัวแปรให้ตรงกับ Render แล้ว)
+// 1. สร้าง Connection Pool (ระบบต่อสายอัตโนมัติ)
 // ==========================================
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,          // ✅ แก้เป็น DB_HOST
-    user: process.env.DB_USER,          // ✅ แก้เป็น DB_USER
-    password: process.env.DB_PASSWORD,  // ✅ แก้เป็น DB_PASSWORD
-    database: process.env.DB_NAME || 'test', // ✅ เพิ่ม DB_NAME
-    port: process.env.DB_PORT || 4000,       // ✅ เพิ่ม DB_PORT
-    ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true }
+const db = mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'test',
+    port: process.env.DB_PORT || 4000,
+    ssl: { minVersion: 'TLSv1.2', rejectUnauthorized: true },
+    waitForConnections: true, // ถ้าคู่สายเต็ม ให้รอคิว
+    connectionLimit: 10,      // รองรับ 10 สายพร้อมกัน
+    queueLimit: 0
 });
 
-db.connect((err) => {
+// เช็คว่าเชื่อมต่อได้ไหม (Test Connection)
+db.getConnection((err, connection) => {
     if (err) {
-        console.error('Error connecting to TiDB:', err);
-        // ให้มันแจ้งเตือนใน Logs ว่าพังเพราะอะไร
-        console.error('Connection Config:', {
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            db: process.env.DB_NAME
+        console.error('❌ Database Connection Failed:', err.message);
+        console.error('Config:', { 
+            host: process.env.DB_HOST, 
+            user: process.env.DB_USER 
         });
     } else {
-        console.log('✅ Connected to TiDB Cloud successfully!');
+        console.log('✅ Connected to TiDB Cloud via Pool!');
+        connection.release(); // คืนสายให้คนอื่นใช้ต่อ
     }
 });
 
@@ -39,9 +42,8 @@ db.connect((err) => {
 app.get('/', (req, res) => {
     res.send(`
         <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
-            <h1 style="color: #2da44e;">✅ Backend Server is Running!</h1>
+            <h1 style="color: #2da44e;">✅ Backend Server is Running (Pool Mode)!</h1>
             <p>Status: Online</p>
-            <p>Database: Connected via DB_HOST</p>
         </div>
     `);
 });
@@ -54,6 +56,7 @@ app.get('/', (req, res) => {
 app.post('/api/register', (req, res) => {
     const { email, password, prefix, first_name, last_name, gender, phone } = req.body;
 
+    // Pool จะจัดการ connection ให้เอง ไม่ต้อง connect/end มือ
     db.query('SELECT * FROM users WHERE email = ?', [email], (err, results) => {
         if (err) {
             console.error(err);
