@@ -10,19 +10,26 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // --- Setup Gemini AI ---
+// ตรวจสอบว่ามี API Key หรือไม่เพื่อป้องกัน error
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// --- Database Connection ---
+// --- Database Connection (แก้ไขสำหรับ TiDB) ---
 const db = mysql.createPool({
   host: process.env.DB_HOST, 
   user: process.env.DB_USER, 
   password: process.env.DB_PASSWORD, 
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
+  // TiDB มักใช้พอร์ต 4000 เป็นค่าเริ่มต้น
+  port: process.env.DB_PORT || 4000, 
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  // *** สำคัญ: เปิดใช้ SSL สำหรับเชื่อมต่อ TiDB Cloud ***
+  ssl: {
+    minVersion: 'TLSv1.2',
+    rejectUnauthorized: true
+  }
 });
 
 // --- API Routes ---
@@ -35,7 +42,15 @@ app.post('/api/login', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     if (results.length > 0) {
       const user = results[0];
-      res.json({ id: user.id, email: user.email, prefix: user.prefix, firstName: user.first_name, lastName: user.last_name, role: user.role });
+      // ส่งข้อมูล User กลับไป (ไม่ส่ง Password)
+      res.json({ 
+        id: user.id, 
+        email: user.email, 
+        prefix: user.prefix, 
+        firstName: user.first_name, 
+        lastName: user.last_name, 
+        role: user.role 
+      });
     } else {
       res.status(401).json({ message: 'Login failed' });
     }
@@ -45,9 +60,10 @@ app.post('/api/login', (req, res) => {
 // Register
 app.post('/api/register', (req, res) => {
   const { email, password, prefix, firstName, lastName, gender, phone } = req.body;
+  // กำหนด role เริ่มต้นเป็น 'user'
   const sql = `INSERT INTO users (email, password, prefix, first_name, last_name, gender, phone, role) VALUES (?, ?, ?, ?, ?, ?, ?, 'user')`;
   db.query(sql, [email, password, prefix, firstName, lastName, gender, phone], (err, result) => {
-    if (err) return res.status(500).json({ error: 'Register failed' });
+    if (err) return res.status(500).json({ error: 'Register failed: ' + err.message });
     res.json({ message: 'Register success' });
   });
 });
@@ -80,7 +96,7 @@ app.delete('/api/news/:id', (req, res) => {
   });
 });
 
-// Get Users
+// Get Users (สำหรับ Admin)
 app.get('/api/users', (req, res) => {
   const sql = 'SELECT id, email, prefix, first_name, last_name, role, phone FROM users';
   db.query(sql, (err, results) => {
@@ -104,7 +120,7 @@ app.delete('/api/users/:id', (req, res) => {
 app.post('/api/ai/summarize', async (req, res) => {
   try {
     const { content } = req.body;
-    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: "No API Key" });
+    if (!process.env.GEMINI_API_KEY) return res.status(500).json({ error: "No API Key configured on server" });
     
     const prompt = `สรุปข่าวต่อไปนี้ให้กระชับ เข้าใจง่าย ไม่เกิน 3 บรรทัด เป็นภาษาไทย:\n\n${content}`;
     const result = await model.generateContent(prompt);
@@ -112,7 +128,7 @@ app.post('/api/ai/summarize', async (req, res) => {
     res.json({ summary: response.text() });
   } catch (error) {
     console.error("AI Error:", error);
-    res.status(500).json({ error: "AI Failed" });
+    res.status(500).json({ error: "AI Processing Failed" });
   }
 });
 
