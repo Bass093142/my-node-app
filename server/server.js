@@ -8,7 +8,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ==========================================
 // 1. เชื่อมต่อ Database TiDB
+// ==========================================
 const db = mysql.createConnection({
     host: process.env.TIDB_HOST,
     user: process.env.TIDB_USER,
@@ -24,7 +26,20 @@ db.connect((err) => {
 });
 
 // ==========================================
-// 2. API Routes (รวมทุกระบบไว้ที่นี่)
+// 2. หน้าแรก (Root Route) - แก้ปัญหา Cannot GET /
+// ==========================================
+app.get('/', (req, res) => {
+    res.send(`
+        <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+            <h1 style="color: #2da44e;">✅ Backend Server is Running!</h1>
+            <p>Status: Online</p>
+            <p>Database: TiDB Cloud</p>
+        </div>
+    `);
+});
+
+// ==========================================
+// 3. API Routes (ทางเข้าข้อมูล)
 // ==========================================
 
 // --- ระบบสมัครสมาชิก (Register) ---
@@ -42,7 +57,7 @@ app.post('/api/register', (req, res) => {
             return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
         }
 
-        // 2. บันทึกสมาชิกใหม่
+        // 2. บันทึกสมาชิกใหม่ (Default role = 'user')
         const sql = `INSERT INTO users (email, password, prefix, first_name, last_name, gender, phone, role) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, 'user')`;
                      
@@ -86,7 +101,7 @@ app.get('/api/news', (req, res) => {
 });
 
 // ==========================================
-// 3. เริ่มต้น Server
+// 4. เริ่มต้น Server
 // ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
