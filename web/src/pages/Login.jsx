@@ -1,12 +1,16 @@
-import { useState } from 'react';
-import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
-const API_URL = 'https://my-node-app-fce8.onrender.com/'; // ⚠️ แก้ตรงนี้
-
-function Login() {
-  const [formData, setFormData] = useState({ email: '', password: '' });
+export default function Login() {
   const navigate = useNavigate();
+  // ดึงลิงก์ Backend จาก Environment (ถ้าไม่มีให้ใช้ localhost)
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -14,45 +18,123 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
-      const res = await axios.post(`${API_URL}/api/login`, formData); // แก้ path ให้ตรงกับ server
-      alert('เข้าสู่ระบบสำเร็จ!');
-      localStorage.setItem('user', JSON.stringify(res.data));
-      navigate('/');
-      window.location.reload();
-    } catch (err) {
-      alert('เข้าสู่ระบบไม่ผ่าน: ' + (err.response?.data?.message || 'ตรวจสอบอีเมล/รหัสผ่าน'));
+      // ยิงข้อมูลไปเช็คที่ Backend
+      const response = await fetch(`${apiUrl}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // ✅ ล็อกอินสำเร็จ
+        
+        // 1. บันทึกข้อมูลผู้ใช้ลงเครื่อง (เพื่อให้หน้าอื่นรู้ว่าใครล็อกอิน)
+        localStorage.setItem('user', JSON.stringify(data));
+
+        // 2. แจ้งเตือนสวยๆ
+        Swal.fire({
+          icon: 'success',
+          title: 'เข้าสู่ระบบสำเร็จ!',
+          text: `ยินดีต้อนรับคุณ ${data.first_name || 'ผู้ใช้งาน'}`,
+          timer: 1500,
+          showConfirmButton: false
+        }).then(() => {
+          // 3. ไปที่หน้าแรก (และรีโหลด 1 ครั้งเพื่ออัปเดตเมนู)
+          navigate('/');
+          window.location.reload(); 
+        });
+
+      } else {
+        // ❌ ล็อกอินไม่สำเร็จ (รหัสผิด / หาไม่เจอ)
+        Swal.fire({
+          icon: 'error',
+          title: 'เข้าสู่ระบบไม่สำเร็จ',
+          text: data.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+        });
+      }
+
+    } catch (error) {
+      console.error('Login Error:', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'เกิดข้อผิดพลาด',
+        text: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่ภายหลัง'
+      });
     }
   };
 
+  // สไตล์ Input (เหมือนหน้าสมัครสมาชิก)
+  const inputClass = "appearance-none relative block w-full px-4 py-3 border border-gray-300 rounded-lg placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-gray-400 sm:text-sm shadow-sm transition-all";
+  const labelClass = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+
   return (
-    <div className="flex justify-center items-center min-h-[80vh]">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-100">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">ยินดีต้อนรับกลับ</h2>
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-gray-700 mb-2 font-medium">อีเมล</label>
-            <input 
-              type="email" name="email" required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              onChange={handleChange}
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 mb-2 font-medium">รหัสผ่าน</label>
-            <input 
-              type="password" name="password" required
-              className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              onChange={handleChange}
-            />
-          </div>
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold shadow-md transition transform active:scale-95">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 font-sarabun transition-colors duration-300">
+      <div className="max-w-md w-full space-y-8 bg-white dark:bg-slate-800 p-8 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700">
+        
+        {/* หัวข้อ */}
+        <div className="text-center">
+          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white">
             เข้าสู่ระบบ
-          </button>
+          </h2>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            กรอกอีเมลและรหัสผ่านเพื่อใช้งาน
+          </p>
+        </div>
+
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            
+            {/* ช่องอีเมล */}
+            <div>
+              <label className={labelClass}>อีเมล</label>
+              <input 
+                name="email" 
+                type="email" 
+                required 
+                placeholder="name@example.com" 
+                className={inputClass} 
+                onChange={handleChange} 
+              />
+            </div>
+
+            {/* ช่องรหัสผ่าน */}
+            <div>
+              <label className={labelClass}>รหัสผ่าน</label>
+              <input 
+                name="password" 
+                type="password" 
+                required 
+                placeholder="••••••••" 
+                className={inputClass} 
+                onChange={handleChange} 
+              />
+            </div>
+
+          </div>
+
+          {/* ปุ่ม Login */}
+          <div>
+            <button type="submit" className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+              เข้าสู่ระบบ
+            </button>
+          </div>
+
+          {/* ลิงก์ไปหน้าสมัครสมาชิก */}
+          <div className="text-center mt-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              ยังไม่มีบัญชี?{' '}
+              <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
+                สมัครสมาชิกใหม่
+              </Link>
+            </p>
+          </div>
+
         </form>
       </div>
     </div>
   );
 }
-
-export default Login;
