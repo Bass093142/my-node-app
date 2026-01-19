@@ -185,7 +185,7 @@ export default function AdminDashboard() {
                     {/* ✅ TinyMCE Editor */}
                     <div className="border rounded-lg overflow-hidden">
                         <Editor
-                            apiKey="no-api-key" // ถ้ามี API Key ใส่ตรงนี้ได้เลย (no-api-key จะมี warning นิดหน่อยแต่ใช้ได้)
+                            apiKey="ty1y0bweonlgsxi46gf4sk9olwcqgnkczuacoq5do8q7dz9p" // ถ้ามี API Key ใส่ตรงนี้ได้เลย (no-api-key จะมี warning นิดหน่อยแต่ใช้ได้)
                             onInit={(evt, editor) => editorRef.current = editor}
                             initialValue={newsForm.content}
                             init={{
