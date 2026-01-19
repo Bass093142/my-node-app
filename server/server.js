@@ -3,33 +3,34 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// 1. นำเข้า Database Config (เพื่อให้ Server เริ่มทำงาน Connection Pool รอไว้)
+// 1. เชื่อมต่อฐานข้อมูล (เรียกใช้ไฟล์ db.js ในโฟลเดอร์ config)
+// ⚠️ ถ้าไฟล์ db.js ของคุณอยู่ที่หน้าแรก ให้แก้เป็น: require('./db');
 const db = require('./config/db'); 
 
 // 2. นำเข้า Routes (ไฟล์ที่แยกไว้ในโฟลเดอร์ routes)
 const authRoutes = require('./routes/auth');
 const newsRoutes = require('./routes/news');
 const aiRoutes = require('./routes/ai');
-const adminRoutes = require('./routes/admin'); // ✅ เพิ่ม Route แอดมิน
+const adminRoutes = require('./routes/admin'); // ✅ ส่วนที่เพิ่มมา
 
 app.use(cors());
 app.use(express.json());
 
-// Test Route (หน้าแรก)
+// Test Route (เช็คว่า Server ทำงานไหม)
 app.get('/', (req, res) => {
     res.send(`
-        <div style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+        <div style="text-align: center; padding-top: 50px; font-family: sans-serif;">
             <h1 style="color: #2da44e;">✅ Backend Server is Running!</h1>
-            <p>Ready with Modules: Auth, News, AI, Admin</p>
+            <p>Services: Auth, News, AI, Admin</p>
         </div>
     `);
 });
 
-// 3. เรียกใช้งาน Routes (Map URL ให้ตรงกับไฟล์)
-app.use('/api', authRoutes);          // ->Login/Register/Reset Pass
-app.use('/api/news', newsRoutes);     // -> ข่าว, คอมเมนต์, ยอดวิว
-app.use('/api/ai', aiRoutes);         // -> AI สรุปข่าว
-app.use('/api/admin', adminRoutes);   // -> ✅ จัดการ User, Report
+// 3. ใช้งาน Routes
+app.use('/api', authRoutes);          // สำหรับ Login/Register
+app.use('/api/news', newsRoutes);     // สำหรับ ข่าว
+app.use('/api/ai', aiRoutes);         // สำหรับ AI
+app.use('/api/admin', adminRoutes);   // ✅ สำหรับ Admin Dashboard
 
 // Start Server
 const PORT = process.env.PORT || 3000;
