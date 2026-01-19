@@ -1,16 +1,25 @@
-// ... (code เดิม)
+const express = require('express');        // 1. เรียกใช้ Express
+const router = express.Router();           // 2. ✅ สร้างตัวแปร router ตรงนี้ (ที่ Error เพราะบรรทัดนี้หาย)
+const db = require('../config/db');        // 3. เรียกใช้ Database
 
-// 1. เพิ่ม Security Question ตอน Register
+// ==========================================
+// 🔐 ส่วนจัดการสมาชิก (Auth)
+// ==========================================
+
+// 1. สมัครสมาชิก (Register)
 router.post('/register', async (req, res) => {
-    // รับ security_question, security_answer มาด้วย
-    const { email, password, prefix, first_name, last_name, phone, gender, security_question, security_answer } = req.body;
+    const { email, password, prefix, first_name, last_name, phone, gender } = req.body;
     try {
+        // เช็คอีเมลซ้ำ
         const [existing] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (existing.length > 0) return res.status(400).json({ message: 'อีเมลนี้ใช้ไปแล้ว' });
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+        }
 
+        // เพิ่มลงฐานข้อมูล
         await db.query(
-            'INSERT INTO users (email, password, prefix, first_name, last_name, phone, gender, role, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, "user", ?, ?)',
-            [email, password, prefix, first_name, last_name, phone, gender, security_question, security_answer]
+            'INSERT INTO users (email, password, prefix, first_name, last_name, phone, gender, role) VALUES (?, ?, ?, ?, ?, ?, ?, "user")', 
+            [email, password, prefix, first_name, last_name, phone, gender]
         );
         res.json({ status: 'ok', message: 'สมัครสมาชิกสำเร็จ' });
     } catch (err) {
@@ -18,22 +27,25 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// 2. ฟังก์ชันกู้รหัสผ่าน (ตรวจสอบคำตอบ)
-router.post('/reset-password', async (req, res) => {
-    const { email, answer, newPassword } = req.body; // รับคำตอบสัตว์เลี้ยง และรหัสใหม่
+// 2. เข้าสู่ระบบ (Login)
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
-        if (users.length === 0) return res.status(404).json({ message: 'ไม่พบอีเมลนี้' });
-
-        const user = users[0];
-        // เช็คคำตอบ (ควรระวังเรื่อง Case Sensitive ถ้าอยากให้เป๊ะ)
-        if (user.security_answer !== answer) {
-            return res.status(400).json({ message: 'คำตอบคำถามความปลอดภัยไม่ถูกต้อง' });
+        const [users] = await db.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
+        if (users.length > 0) {
+            const user = users[0];
+            // เช็คสถานะแบน
+            if (user.is_banned) {
+                return res.status(403).json({ message: 'บัญชีของคุณถูกระงับการใช้งาน' });
+            }
+            res.json({ 
+                status: 'ok', 
+                message: 'Login successful',
+                user: user 
+            });
+        } else {
+            res.status(401).json({ status: 'error', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
         }
-
-        // อัปเดตรหัสผ่านใหม่
-        await db.query('UPDATE users SET password = ? WHERE id = ?', [newPassword, user.id]);
-        res.json({ status: 'ok', message: 'เปลี่ยนรหัสผ่านสำเร็จ' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
