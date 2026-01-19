@@ -3,7 +3,7 @@ const router = express.Router();           // 2. ✅ สร้างตัวแ
 const db = require('../config/db');        // 3. เรียกใช้ Database
 
 // ==========================================
-// 🔐 ส่วนจัดการสมาชิก (Auth)
+//  ส่วนจัดการสมาชิก (Auth)
 // ==========================================
 
 // 1. สมัครสมาชิก (Register)
@@ -46,6 +46,34 @@ router.post('/login', async (req, res) => {
         } else {
             res.status(401).json({ status: 'error', message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
         }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ✅ อัปเดตโปรไฟล์ผู้ใช้ (ชื่อ, รูป, รหัสผ่าน)
+router.put('/profile', async (req, res) => {
+    const { id, first_name, last_name, profile_image, password } = req.body;
+    
+    try {
+        let sql = 'UPDATE users SET first_name = ?, last_name = ?, profile_image = ? WHERE id = ?';
+        let params = [first_name, last_name, profile_image, id];
+
+        if (password && password.trim() !== '') {
+            sql = 'UPDATE users SET first_name = ?, last_name = ?, profile_image = ?, password = ? WHERE id = ?';
+            params = [first_name, last_name, profile_image, password, id];
+        }
+
+        await db.query(sql, params);
+        
+        // ดึงข้อมูลล่าสุดส่งกลับไปอัปเดตหน้าบ้าน
+        const [users] = await db.query('SELECT id, email, first_name, last_name, role, profile_image, prefix, phone FROM users WHERE id = ?', [id]);
+        
+        res.json({ 
+            status: 'ok', 
+            message: 'อัปเดตข้อมูลสำเร็จ',
+            user: users[0]
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
