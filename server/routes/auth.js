@@ -1,54 +1,42 @@
-const express = require('express');
-const router = express.Router();
-const db = require('../config/db');
+// ... (code เดิม)
 
-// Login
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const [users] = await db.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
-    if (users.length > 0) {
-      const user = users[0];
-      res.json({ 
-        status: 'ok', 
-        user: { 
-          id: user.id, 
-          name: user.first_name, 
-          role: user.role, 
-          prefix: user.prefix 
-        } 
-      });
-    } else {
-      res.status(401).json({ status: 'error', message: 'Login failed' });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Register
+// 1. เพิ่ม Security Question ตอน Register
 router.post('/register', async (req, res) => {
-  const { email, password, prefix, firstName, lastName, phone } = req.body;
-  try {
-    // Default role คือ 'user'
-    await db.query(
-      'INSERT INTO users (email, password, prefix, first_name, last_name, phone, role) VALUES (?, ?, ?, ?, ?, ?, "user")', 
-      [email, password, prefix, firstName, lastName, phone]
-    );
-    res.json({ status: 'ok', message: 'User registered' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    // รับ security_question, security_answer มาด้วย
+    const { email, password, prefix, first_name, last_name, phone, gender, security_question, security_answer } = req.body;
+    try {
+        const [existing] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) return res.status(400).json({ message: 'อีเมลนี้ใช้ไปแล้ว' });
+
+        await db.query(
+            'INSERT INTO users (email, password, prefix, first_name, last_name, phone, gender, role, security_question, security_answer) VALUES (?, ?, ?, ?, ?, ?, ?, "user", ?, ?)',
+            [email, password, prefix, first_name, last_name, phone, gender, security_question, security_answer]
+        );
+        res.json({ status: 'ok', message: 'สมัครสมาชิกสำเร็จ' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Get Users (Admin only)
-router.get('/users', async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT id, email, prefix, first_name, last_name, role, phone FROM users');
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+// 2. ฟังก์ชันกู้รหัสผ่าน (ตรวจสอบคำตอบ)
+router.post('/reset-password', async (req, res) => {
+    const { email, answer, newPassword } = req.body; // รับคำตอบสัตว์เลี้ยง และรหัสใหม่
+    try {
+        const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (users.length === 0) return res.status(404).json({ message: 'ไม่พบอีเมลนี้' });
+
+        const user = users[0];
+        // เช็คคำตอบ (ควรระวังเรื่อง Case Sensitive ถ้าอยากให้เป๊ะ)
+        if (user.security_answer !== answer) {
+            return res.status(400).json({ message: 'คำตอบคำถามความปลอดภัยไม่ถูกต้อง' });
+        }
+
+        // อัปเดตรหัสผ่านใหม่
+        await db.query('UPDATE users SET password = ? WHERE id = ?', [newPassword, user.id]);
+        res.json({ status: 'ok', message: 'เปลี่ยนรหัสผ่านสำเร็จ' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 module.exports = router;
