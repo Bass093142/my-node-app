@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); // ✅ อันนี้ถูก (ถอยออกไป แล้วเข้า config)
+const db = require('../config/db'); // ✅ เรียกใช้ Database
+
 // ==========================================
-// 📰 ส่วนจัดการข่าว (News Management)
+// 📰 1. ส่วนจัดการข่าว (News Management)
 // ==========================================
 
-// 1. ดึงข่าวทั้งหมด (หน้า Home / Admin)
-// - จอยกับตาราง Categories เพื่อเอาชื่อหมวดมาแสดง
+// 1.1 ดึงข่าวทั้งหมด (สำหรับหน้าแรก / Admin)
 router.get('/', async (req, res) => {
     try {
         const sql = `
@@ -23,7 +23,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// 2. ดึงข่าวรายตัว (หน้าอ่านข่าว)
+// 1.2 ดึงข่าวรายตัว (สำหรับหน้าอ่านข่าว NewsDetail)
 router.get('/:id', async (req, res) => {
     try {
         const sql = `
@@ -43,9 +43,8 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// 3. เพิ่มข่าวใหม่ (Create)
+// 1.3 เพิ่มข่าวใหม่ (Create)
 router.post('/', async (req, res) => {
-    // รับค่าจาก Frontend
     const { title, content, category_id, image_url, author_name } = req.body;
 
     if (!title || !content || !category_id) {
@@ -69,7 +68,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 4. แก้ไขข่าว (Update)
+// 1.4 แก้ไขข่าว (Update)
 router.put('/:id', async (req, res) => {
     const { title, content, category_id, image_url } = req.body;
     try {
@@ -85,7 +84,7 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// 5. ลบข่าว (Delete)
+// 1.5 ลบข่าว (Delete)
 router.delete('/:id', async (req, res) => {
     try {
         await db.query('DELETE FROM news WHERE id = ?', [req.params.id]);
@@ -96,10 +95,10 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ==========================================
-// 👁️ ส่วนยอดวิว (Views)
+// 👁️ 2. ส่วนยอดวิว (Views)
 // ==========================================
 
-// 6. เพิ่มยอดวิว (ยิง API นี้ตอนเปิดหน้าข่าว)
+// เพิ่มยอดวิวทีละ 1 (เรียกใช้ตอนกดอ่านข่าว)
 router.post('/:id/view', async (req, res) => {
     try {
         await db.query('UPDATE news SET view_count = view_count + 1 WHERE id = ?', [req.params.id]);
@@ -110,15 +109,66 @@ router.post('/:id/view', async (req, res) => {
 });
 
 // ==========================================
-// 💬 ส่วนคอมเมนต์ (Comments)
+// 📂 3. ส่วนจัดการหมวดหมู่ (Categories CRUD)
 // ==========================================
 
-// 7. ดึงคอมเมนต์ของข่าว (พร้อมชื่อคนเมนต์)
+// 3.1 ดึงหมวดหมู่ทั้งหมด (ใช้ในหน้าแรก และ Dropdown)
+router.get('/categories/all', async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM categories ORDER BY id ASC');
+        res.json(rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3.2 เพิ่มหมวดหมู่ใหม่
+router.post('/categories', async (req, res) => {
+    const { name } = req.body;
+    try {
+        await db.query('INSERT INTO categories (name) VALUES (?)', [name]);
+        res.json({ message: 'เพิ่มหมวดหมู่สำเร็จ' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3.3 แก้ไขชื่อหมวดหมู่
+router.put('/categories/:id', async (req, res) => {
+    const { name } = req.body;
+    try {
+        await db.query('UPDATE categories SET name = ? WHERE id = ?', [name, req.params.id]);
+        res.json({ message: 'แก้ไขหมวดหมู่สำเร็จ' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 3.4 ลบหมวดหมู่ (มีระบบป้องกันถ้ามีข่าวใช้อยู่)
+router.delete('/categories/:id', async (req, res) => {
+    try {
+        // เช็คก่อนว่ามีข่าวในหมวดหมู่นี้ไหม
+        const [check] = await db.query('SELECT * FROM news WHERE category_id = ?', [req.params.id]);
+        if (check.length > 0) {
+            return res.status(400).json({ message: 'ไม่สามารถลบได้ เนื่องจากมีข่าวในหมวดหมู่นี้อยู่' });
+        }
+        
+        await db.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
+        res.json({ message: 'ลบหมวดหมู่สำเร็จ' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// 💬 4. ส่วนคอมเมนต์ (Comments - เผื่อใช้)
+// ==========================================
+
+// ดึงคอมเมนต์ของข่าวนั้นๆ
 router.get('/:id/comments', async (req, res) => {
     try {
-        // JOIN ตาราง users เพื่อให้รู้ว่าใครเป็นคนเมนต์ (ชื่อ + นามสกุล)
         const sql = `
-            SELECT c.*, u.first_name, u.last_name, u.role, u.prefix 
+            SELECT c.*, u.first_name, u.last_name, u.role, u.prefix, u.profile_image
             FROM comments c
             JOIN users u ON c.user_id = u.id
             WHERE c.news_id = ?
@@ -131,43 +181,26 @@ router.get('/:id/comments', async (req, res) => {
     }
 });
 
-// 8. เพิ่มคอมเมนต์ใหม่
+// โพสต์คอมเมนต์
 router.post('/:id/comments', async (req, res) => {
     const { user_id, content } = req.body;
-    
     if (!user_id || !content) {
         return res.status(400).json({ message: 'ข้อมูลไม่ครบ' });
     }
-
     try {
         const sql = 'INSERT INTO comments (news_id, user_id, content) VALUES (?, ?, ?)';
         await db.query(sql, [req.params.id, user_id, content]);
-        
         res.json({ status: 'ok', message: 'คอมเมนต์เรียบร้อยแล้ว' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// 9. ลบคอมเมนต์ (สำหรับ Admin/Offai หรือเจ้าของเมนต์)
+// ลบคอมเมนต์
 router.delete('/comments/:commentId', async (req, res) => {
     try {
         await db.query('DELETE FROM comments WHERE id = ?', [req.params.commentId]);
         res.json({ message: 'ลบคอมเมนต์แล้ว' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// ==========================================
-// 📂 ส่วนหมวดหมู่ (Categories) - แถมให้
-// ==========================================
-
-// 10. ดึงหมวดหมู่ทั้งหมด (ใช้ตอนสร้างข่าว ใส่ใน Dropdown)
-router.get('/categories/all', async (req, res) => {
-    try {
-        const [rows] = await db.query('SELECT * FROM categories');
-        res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
