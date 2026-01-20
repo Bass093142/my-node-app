@@ -78,5 +78,25 @@ router.put('/profile', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// ... (code เดิม)
+
+// ✅ กู้คืนรหัสผ่านด้วยชื่อสัตว์เลี้ยง
+router.post('/reset-password', async (req, res) => {
+    const { email, pet_name, new_password } = req.body;
+    try {
+        // เช็คว่า Email และ Pet Name ตรงกันไหม
+        const [users] = await db.query('SELECT * FROM users WHERE email = ? AND pet_name = ?', [email, pet_name]);
+        
+        if (users.length === 0) {
+            return res.status(400).json({ message: 'ข้อมูลไม่ถูกต้อง (อีเมลหรือชื่อสัตว์เลี้ยงผิด)' });
+        }
+
+        // อัปเดตรหัสผ่านใหม่
+        await db.query('UPDATE users SET password = ? WHERE id = ?', [new_password, users[0].id]);
+        res.json({ status: 'ok', message: 'เปลี่ยนรหัสผ่านสำเร็จแล้ว' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 module.exports = router;
