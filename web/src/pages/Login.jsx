@@ -102,6 +102,10 @@ export default function Login() {
               </Link>
             </p>
           </div>
+          <div>
+                <label className="block text-sm font-medium mb-1 dark:text-gray-300">ชื่อสัตว์เลี้ยง (ใช้กู้รหัสผ่าน) *</label>
+                <input name="pet_name" type="text" required placeholder="ตั้งชื่อสัตว์เลี้ยงเพื่อความปลอดภัย" className={inputClass} onChange={handleChange} />
+          </div>
         </form>
       </div>
     </div>
