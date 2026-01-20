@@ -3,8 +3,8 @@ const router = express.Router();
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // ⚠️ ใส่ API KEY ของคุณตรงนี้ (หรือใส่ใน .env)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyD9rK3cdAHr7_NPMIJ-v397TJ9d-YrSgXo"); 
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyD9rK3cdAHr7_NPMIJ-v397TJ9d-YrSgXo");
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // 1. 🤖 AI สรุปข่าว
 router.post('/summarize', async (req, res) => {
