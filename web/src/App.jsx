@@ -8,7 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import NewsDetail from './pages/NewsDetail';
 import Profile from './pages/Profile'; 
 import CookieConsent from './components/CookieConsent'; 
-// ✅ 1. เพิ่มบรรทัดนี้ (Import หน้าลืมรหัสผ่าน)
+// ✅ 1. Import ไฟล์เข้ามา
 import ForgotPassword from './pages/ForgotPassword'; 
 
 function App() {
@@ -100,8 +100,10 @@ function App() {
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          {/* ✅ 2. เพิ่ม Route ตรงนี้ */}
+          
+          {/* ✅ 2. เพิ่ม Route นี้เข้าไปครับ ไม่งั้นจะขึ้น Error No routes matched */}
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          
           <Route path="/profile" element={user ? <Profile /> : <div className="text-center mt-10">กรุณาเข้าสู่ระบบ</div>} />
           <Route path="/admin" element={user?.role === 'admin' ? <AdminDashboard /> : <div className="text-center mt-10 text-red-500">Access Denied</div>} />
         </Routes>
