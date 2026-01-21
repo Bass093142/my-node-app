@@ -28,8 +28,26 @@ router.get('/stats', async (req, res) => {
 // ดึงรายชื่อผู้ใช้ทั้งหมด
 router.get('/users', async (req, res) => {
     try { 
+        // เรียงลำดับจากใหม่ไปเก่า
         const [rows] = await db.query('SELECT id, first_name, last_name, email, role, profile_image, is_banned, ban_reason, created_at FROM users ORDER BY created_at DESC'); 
         res.json(rows); 
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// ✅ [NEW] เปลี่ยนสิทธิ์ผู้ใช้งาน (เช่น ตั้งเป็น Officer หรือ Admin)
+router.put('/users/:id/role', async (req, res) => {
+    const { role } = req.body; // รับค่า: 'user', 'officer', 'admin'
+    
+    // ป้องกันการส่งค่ามั่ว
+    if (!['user', 'officer', 'admin'].includes(role)) {
+        return res.status(400).json({ message: 'ค่า Role ไม่ถูกต้อง' });
+    }
+
+    try { 
+        await db.query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]); 
+        res.json({ message: `อัปเดตสิทธิ์เป็น ${role} เรียบร้อยแล้ว` }); 
     } catch (err) { 
         res.status(500).json({ error: err.message }); 
     }
@@ -63,7 +81,7 @@ router.delete('/users/:id', async (req, res) => {
 // ⚠️ 3. Report Management (จัดการแจ้งปัญหา)
 // ==========================================
 
-// ดึงรายการแจ้งปัญหาทั้งหมด (สำหรับ Admin)
+// ดึงรายการแจ้งปัญหาทั้งหมด
 router.get('/reports', async (req, res) => {
     try {
         const sql = `
@@ -93,7 +111,7 @@ router.post('/reports', async (req, res) => {
     }
 });
 
-// อัปเดตสถานะ (เช่น รอตรวจสอบ -> ปิดงาน)
+// อัปเดตสถานะ (เช่น pending -> closed)
 router.put('/reports/:id/status', async (req, res) => {
     const { status } = req.body;
     try { 
@@ -105,7 +123,7 @@ router.put('/reports/:id/status', async (req, res) => {
 });
 
 // ✅ ตอบกลับ User (Reply System)
-// ฟังก์ชันนี้สำคัญ: จะบันทึกคำตอบลงฐานข้อมูล และเปลี่ยนสถานะเป็น "resolved" (แก้ไขแล้ว) ทันที
+// บันทึกคำตอบ + เปลี่ยนสถานะเป็น resolved ทันที
 router.put('/reports/:id/reply', async (req, res) => {
     const { reply } = req.body;
     try {
@@ -119,7 +137,7 @@ router.put('/reports/:id/reply', async (req, res) => {
     }
 });
 
-// ✅ ดึงประวัติการแจ้งปัญหาของ User คนเดียว (สำหรับหน้า Home ของ User)
+// ✅ ดึงประวัติการแจ้งปัญหาของ User คนเดียว
 router.get('/reports/user/:userId', async (req, res) => {
     try {
         const [rows] = await db.query(

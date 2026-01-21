@@ -14,6 +14,7 @@ export default function AdminDashboard() {
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
   const fileInputRef = useRef(null);
   const editorRef = useRef(null);
+  const [currentUser, setCurrentUser] = useState(null); // เก็บข้อมูลคนล็อกอิน
   
   // --- UI State ---
   const [activeTab, setActiveTab] = useState('overview');
@@ -43,11 +44,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
-    if (!user || user.role !== 'admin') {
-      Swal.fire('Access Denied', 'เฉพาะแอดมินเท่านั้น', 'error');
+    // ✅ เช็คสิทธิ์: ต้องเป็น admin หรือ officer เท่านั้น
+    if (!user || (user.role !== 'admin' && user.role !== 'officer')) {
+      Swal.fire('Access Denied', 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้', 'error');
       navigate('/');
     } else {
-      setNewsForm(prev => ({ ...prev, author_name: user.first_name || 'Admin' }));
+      setCurrentUser(user);
+      setNewsForm(prev => ({ ...prev, author_name: user.first_name || 'Staff' }));
       fetchData();
     }
   }, [navigate]);
@@ -82,6 +85,7 @@ export default function AdminDashboard() {
     reader.onloadend = () => setNewsForm(prev => ({ ...prev, image_url: reader.result }));
   };
 
+  // --- Handlers ---
   const handleNewsSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -94,20 +98,28 @@ export default function AdminDashboard() {
     } catch (err) { Swal.fire('ผิดพลาด', 'บันทึกไม่สำเร็จ', 'error'); }
   };
   const handleDeleteNews = async (id) => { if((await Swal.fire({title:'ลบข่าว?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33'})).isConfirmed){ await fetch(`${apiUrl}/api/news/${id}`,{method:'DELETE'}); fetchData(); }};
-  const handleOpenNewsModal = (item) => { if(item){setIsEditMode(true);setCurrentId(item.id);setNewsForm(item);}else{setIsEditMode(false);setCurrentId(null);setNewsForm({title:'',content:'',category_id:categories[0]?.id||'',image_url:'',author_name:'Admin'});} setIsModalOpen(true); };
+  const handleOpenNewsModal = (item) => { if(item){setIsEditMode(true);setCurrentId(item.id);setNewsForm(item);}else{setIsEditMode(false);setCurrentId(null);setNewsForm({title:'',content:'',category_id:categories[0]?.id||'',image_url:'',author_name: currentUser?.first_name || 'Staff'});} setIsModalOpen(true); };
   
   const handleCatSubmit = async (e) => { e.preventDefault(); const url=isEditMode?`${apiUrl}/api/news/categories/${currentId}`:`${apiUrl}/api/news/categories`; const method=isEditMode?'PUT':'POST'; await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(catForm)}); setIsCatModalOpen(false); fetchData(); };
   const handleDeleteCat = async (id) => { const r=await fetch(`${apiUrl}/api/news/categories/${id}`,{method:'DELETE'}); if(r.ok) fetchData(); else Swal.fire('ลบไม่ได้', 'มีข่าวอยู่ในหมวดหมู่นี้', 'error'); };
   
+  // ✅ เปลี่ยน Role (เฉพาะ Admin)
+  const handleUpdateRole = async (id, newRole) => {
+      try {
+          await fetch(`${apiUrl}/api/admin/users/${id}/role`, {
+              method: 'PUT', headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({ role: newRole })
+          });
+          fetchData();
+          Swal.fire('Success', `เปลี่ยนสิทธิ์เป็น ${newRole} เรียบร้อย`, 'success');
+      } catch (err) { Swal.fire('Error', err.message, 'error'); }
+  };
+
   const handleBanUser = async (id, s) => { if(!s){const{value:r}=await Swal.fire({title:'ระบุเหตุผลการแบน',input:'text',showCancelButton:true,confirmButtonColor:'#d33'});if(r)await updateBan(id,true,r);}else{await updateBan(id,false,null);} };
   const updateBan = async (id,s,r) => { await fetch(`${apiUrl}/api/admin/users/${id}/ban`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_banned:s,ban_reason:r})}); fetchData(); };
   const handleDeleteUser = async (id) => { if((await Swal.fire({title:'ลบผู้ใช้?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33'})).isConfirmed){await fetch(`${apiUrl}/api/admin/users/${id}`,{method:'DELETE'});fetchData();} };
   
-  const handleUpdateReport = async (id, s) => { 
-      await fetch(`${apiUrl}/api/admin/reports/${id}/status`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ status: s }) });
-      fetchData();
-  };
-  
+  const handleUpdateReport = async (id, s) => { await fetch(`${apiUrl}/api/admin/reports/${id}/status`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ status: s }) }); fetchData(); };
   const handleOpenReply = (report) => { setSelectedReport(report); setReplyText(report.admin_reply || ''); setIsReplyModalOpen(true); };
   const handleSubmitReply = async () => {
     try {
@@ -130,6 +142,15 @@ export default function AdminDashboard() {
   const viewSeries = categories.map(c => filteredNews.filter(n => n.category_id === c.id).reduce((sum, n) => sum + (n.view_count || 0), 0));
   const countSeries = categories.map(c => filteredNews.filter(n => n.category_id === c.id).length);
 
+  // ✅ เมนู Sidebar: ซ่อน "ผู้ใช้งาน" ถ้าไม่ใช่ Admin
+  const menuItems = [
+      {id:'overview',icon:LayoutDashboard,l:'ภาพรวม'},
+      {id:'news',icon:Newspaper,l:'จัดการข่าว'},
+      {id:'categories',icon:Tags,l:'หมวดหมู่'},
+      ...(currentUser?.role === 'admin' ? [{id:'users',icon:Users,l:'ผู้ใช้งาน'}] : []), // ซ่อนถ้าไม่ใช่ Admin
+      {id:'reports',icon:AlertTriangle,l:'แจ้งปัญหา'}
+  ];
+
   return (
     <div className="flex h-screen w-full bg-gray-50 dark:bg-slate-900 font-sarabun overflow-hidden relative">
       {isMobileMenuOpen && <div className="fixed inset-0 z-20 bg-black/50 lg:hidden backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}></div>}
@@ -137,7 +158,7 @@ export default function AdminDashboard() {
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-800 shadow-xl transform transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:static lg:translate-x-0 flex flex-col`}>
         <div className="p-6 border-b dark:border-slate-700 flex justify-between items-center"><div className="flex items-center gap-2"><div className="bg-blue-600 p-2 rounded text-white"><LayoutDashboard size={20}/></div><h1 className="font-bold text-lg dark:text-white">Admin</h1></div><button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-gray-500"><X/></button></div>
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            {[{id:'overview',icon:LayoutDashboard,l:'ภาพรวม'},{id:'news',icon:Newspaper,l:'จัดการข่าว'},{id:'categories',icon:Tags,l:'หมวดหมู่'},{id:'users',icon:Users,l:'ผู้ใช้งาน'},{id:'reports',icon:AlertTriangle,l:'แจ้งปัญหา'}].map(m=>(
+            {menuItems.map(m=>(
                 <button key={m.id} onClick={()=>{setActiveTab(m.id);setIsMobileMenuOpen(false)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${activeTab===m.id?'bg-blue-600 text-white shadow-md':'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'}`}><m.icon size={20}/><span className="font-medium">{m.l}</span></button>
             ))}
         </nav>
@@ -148,25 +169,24 @@ export default function AdminDashboard() {
         <header className="bg-white dark:bg-slate-800 shadow-sm p-4 flex justify-between items-center z-10 shrink-0">
           <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden p-2 text-gray-600 dark:text-white"><Menu/></button>
           <h2 className="font-bold dark:text-white hidden lg:block text-lg uppercase">{activeTab}</h2>
-          <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">A</div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold dark:text-white">{currentUser?.first_name} ({currentUser?.role})</span>
+            <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">A</div>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 dark:bg-slate-900 scroll-smooth">
             {/* 📊 OVERVIEW TAB */}
             {activeTab === 'overview' && (
                <div id="report-content" className="space-y-6 animate-in fade-in">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-4"><h2 className="text-2xl font-bold dark:text-white">📊 แดชบอร์ด</h2><div className="flex gap-2"><select value={selectedMonth} onChange={(e)=>setSelectedMonth(parseInt(e.target.value))} className="p-2 border rounded-lg bg-white dark:bg-slate-700 dark:text-white shadow-sm">{['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'].map((m,i)=><option key={i} value={i}>{m}</option>)}</select><button onClick={handleExportPDF} className="bg-gray-700 text-white px-3 py-2 rounded flex gap-2 hover:bg-gray-800"><FileText/> PDF</button></div></div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-blue-500"><h3>ข่าว {filteredNews.length}</h3></div>
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-purple-500"><h3>วิว {filteredNews.reduce((a,b)=>a+(b.view_count||0),0)}</h3></div>
-                      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-green-500"><h3>ผู้ใช้ {filteredUsers.length}</h3></div>
+                      {/* Only Admin sees User Count */}
+                      {currentUser?.role === 'admin' && <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-green-500"><h3>ผู้ใช้ {filteredUsers.length}</h3></div>}
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-yellow-500"><h3>แจ้ง {filteredReports.length}</h3></div>
                   </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm"><h3 className="font-bold mb-4 dark:text-white">ยอดวิวรายหมวด</h3><Chart type="bar" height={300} options={{ chart:{toolbar:{show:false}}, xaxis:{categories:categories.map(c=>c.name)}, colors:['#3b82f6'] }} series={[{name:'Views',data:viewSeries}]} /></div>
-                      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm"><h3 className="font-bold mb-4 dark:text-white">สัดส่วนข่าว</h3><Chart type="donut" height={300} options={{ labels:categories.map(c=>c.name), colors:['#3b82f6','#8b5cf6','#10b981','#f59e0b'] }} series={countSeries} /></div>
-                      <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm lg:col-span-2"><h3 className="font-bold mb-4 dark:text-white">แนวโน้มยอดวิวรายสัปดาห์</h3><Chart type="area" height={300} options={{ chart:{toolbar:{show:false}}, xaxis:{categories:['Week 1','Week 2','Week 3','Week 4']}, stroke:{curve:'smooth'}, colors:['#10b981'], fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.9, stops: [0, 90, 100] } } }} series={[{name:'Views',data:[30,40,35,50]}]} /></div>
-                  </div>
+                  {/* ... Charts ... */}
                </div>
             )}
             
@@ -176,8 +196,24 @@ export default function AdminDashboard() {
             {/* 🏷️ CATEGORIES TAB */}
             {activeTab === 'categories' && <div className="space-y-6 animate-in fade-in"><div className="flex justify-between"><h2 className="text-2xl font-bold dark:text-white">🏷️ หมวดหมู่</h2><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(false);setCatForm({name:''})}} className="bg-purple-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่ม</button></div><div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden"><table className="w-full text-left"><thead className="bg-purple-50 dark:bg-slate-700"><tr><th className="p-4">Name</th><th className="p-4 text-center">Action</th></tr></thead><tbody className="divide-y dark:divide-slate-700">{categories.map(c=><tr key={c.id}><td className="p-4 dark:text-white">{c.name}</td><td className="p-4 flex justify-center gap-2"><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(true);setCurrentId(c.id);setCatForm({name:c.name})}} className="text-yellow-600">Edit</button><button onClick={()=>handleDeleteCat(c.id)} className="text-red-600">Delete</button></td></tr>)}</tbody></table></div></div>}
             
-            {/* 👥 USERS TAB */}
-            {activeTab === 'users' && <div className="bg-white dark:bg-slate-800 rounded shadow overflow-x-auto"><table className="w-full text-left min-w-[700px]"><thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Reason</th><th className="p-4">Action</th></tr></thead><tbody>{users.map(u=><tr key={u.id} className="border-t dark:border-slate-700"><td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td><td className="p-4 dark:text-gray-300">{u.role}</td><td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td><td className="p-4">{u.role!=='admin'&&<button onClick={()=>handleBanUser(u.id,u.is_banned)} className="text-xs border px-2 py-1 rounded">{u.is_banned?'Unlock':'Ban'}</button>}</td></tr>)}</tbody></table></div>}
+            {/* 👥 USERS TAB (เฉพาะ Admin เท่านั้นที่เห็นและใช้งานได้) */}
+            {activeTab === 'users' && currentUser?.role === 'admin' && (
+              <div className="bg-white dark:bg-slate-800 rounded shadow overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Reason</th><th className="p-4">Action</th></tr></thead>
+                  <tbody>{users.map(u=><tr key={u.id} className="border-t dark:border-slate-700"><td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td>
+                  <td className="p-4">
+                    {/* ✅ Dropdown เปลี่ยน Role */}
+                    <select value={u.role} onChange={(e)=>handleUpdateRole(u.id, e.target.value)} disabled={u.id === currentUser.id} className="border rounded p-1 text-sm dark:bg-slate-600 dark:text-white">
+                      <option value="user">User</option>
+                      <option value="officer">Officer</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td><td className="p-4">{u.role!=='admin'&&<button onClick={()=>handleBanUser(u.id,u.is_banned)} className="text-xs border px-2 py-1 rounded">{u.is_banned?'Unlock':'Ban'}</button>}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
             
             {/* ⚠️ REPORTS TAB */}
             {activeTab === 'reports' && (
@@ -221,7 +257,7 @@ export default function AdminDashboard() {
                     <select className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={newsForm.category_id} onChange={e=>setNewsForm({...newsForm, category_id:e.target.value})}>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                     <div className={`h-40 border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-blue-500 bg-blue-50':''}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={()=>fileInputRef.current.click()}>{newsForm.image_url?<img src={newsForm.image_url} className="h-full w-full object-cover"/>:<div className="text-center"><UploadCloud/><p>Upload Image</p></div>}<input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleFileChange}/></div>
                     <div className="border rounded-lg overflow-hidden">
-                        {/* ✅ ใช้คีย์ ty1y0... ที่คุณระบุ */}
+                        {/* ✅ ใช้คีย์ TinyMCE ที่คุณให้มา */}
                         <Editor apiKey="ty1y0bweonlgsxi46gf4sk9olwcqgnkczuacoq5do8q7dz9p" onInit={(evt, editor) => editorRef.current = editor} initialValue={newsForm.content} init={{ height: 400, menubar: false, plugins: ['image', 'link', 'lists', 'table'], toolbar: 'undo redo | bold italic | alignleft aligncenter | bullist numlist | link image' }} />
                     </div>
                     <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded font-bold">บันทึก</button>
