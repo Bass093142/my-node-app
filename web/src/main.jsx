@@ -8,7 +8,7 @@ import { ConfigProvider } from './context/ConfigContext.jsx'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {/* ✅ 2. เอา BrowserRouter มาครอบไว้ชั้นนอกสุด (หรือข้างใน ConfigProvider ก็ได้ แต่ต้องครอบ App) */}
+    {/* ✅ 2. เอา BrowserRouter มาครอบไว้ชั้นนอกสุด */}
     <BrowserRouter>
       <ConfigProvider>
         <App />
