@@ -6,8 +6,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import AdminDashboard from './pages/AdminDashboard';
 import NewsDetail from './pages/NewsDetail';
-import Profile from './pages/Profile'; // ✅ หน้าใหม่
-import CookieConsent from './components/CookieConsent'; // ✅ Component ใหม่
+import Profile from './pages/Profile'; 
+import CookieConsent from './components/CookieConsent'; 
+// ✅ 1. เพิ่มบรรทัดนี้ (Import หน้าลืมรหัสผ่าน)
+import ForgotPassword from './pages/ForgotPassword'; 
 
 function App() {
   const navigate = useNavigate();
@@ -51,7 +53,6 @@ function App() {
               )}
               {user ? (
                 <div className="flex items-center gap-4 pl-4 border-l border-gray-200 dark:border-slate-700">
-                  {/* ✅ Link ไปหน้า Profile */}
                   <Link to="/profile" className="flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:opacity-80">
                     {user.profile_image ? (
                         <img src={user.profile_image} className="w-8 h-8 rounded-full object-cover border border-gray-300"/>
@@ -99,12 +100,13 @@ function App() {
           <Route path="/news/:id" element={<NewsDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          {/* ✅ 2. เพิ่ม Route ตรงนี้ */}
+          <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/profile" element={user ? <Profile /> : <div className="text-center mt-10">กรุณาเข้าสู่ระบบ</div>} />
           <Route path="/admin" element={user?.role === 'admin' ? <AdminDashboard /> : <div className="text-center mt-10 text-red-500">Access Denied</div>} />
         </Routes>
       </main>
 
-      {/* ✅ ใส่ Cookie Consent ไว้ล่างสุด */}
       <CookieConsent />
 
       <footer className="bg-white dark:bg-slate-800 border-t dark:border-slate-700 py-6 mt-auto text-center text-gray-500 text-sm">
