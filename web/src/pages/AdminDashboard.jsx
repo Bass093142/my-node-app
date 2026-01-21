@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   // --- Modals ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCatModalOpen, setIsCatModalOpen] = useState(false);
-  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false); // ✅ Modal ตอบกลับ
+  const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [currentId, setCurrentId] = useState(null); 
   
@@ -81,9 +81,7 @@ export default function AdminDashboard() {
     reader.readAsDataURL(file);
     reader.onloadend = () => setNewsForm(prev => ({ ...prev, image_url: reader.result }));
   };
-  const removeImage = () => { setNewsForm(prev => ({ ...prev, image_url: '' })); if (fileInputRef.current) fileInputRef.current.value = ""; };
 
-  // --- Handlers ---
   const handleNewsSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -110,13 +108,7 @@ export default function AdminDashboard() {
       fetchData();
   };
   
-  // ✅ เปิด Modal ตอบกลับแบบแชท
-  const handleOpenReply = (report) => {
-    setSelectedReport(report);
-    setReplyText(report.admin_reply || '');
-    setIsReplyModalOpen(true);
-  };
-
+  const handleOpenReply = (report) => { setSelectedReport(report); setReplyText(report.admin_reply || ''); setIsReplyModalOpen(true); };
   const handleSubmitReply = async () => {
     try {
         await fetch(`${apiUrl}/api/admin/reports/${selectedReport.id}/reply`, {
@@ -131,7 +123,7 @@ export default function AdminDashboard() {
 
   const handleExportPDF = () => html2pdf().from(document.getElementById('report-content')).save('admin-report.pdf');
 
-  // --- Prepare Chart Data ---
+  // Chart Data
   const filteredNews = filterByMonth(newsList);
   const filteredReports = filterByMonth(reports);
   const filteredUsers = filterByMonth(users);
@@ -187,7 +179,7 @@ export default function AdminDashboard() {
             {/* 👥 USERS TAB */}
             {activeTab === 'users' && <div className="bg-white dark:bg-slate-800 rounded shadow overflow-x-auto"><table className="w-full text-left min-w-[700px]"><thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Reason</th><th className="p-4">Action</th></tr></thead><tbody>{users.map(u=><tr key={u.id} className="border-t dark:border-slate-700"><td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td><td className="p-4 dark:text-gray-300">{u.role}</td><td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td><td className="p-4">{u.role!=='admin'&&<button onClick={()=>handleBanUser(u.id,u.is_banned)} className="text-xs border px-2 py-1 rounded">{u.is_banned?'Unlock':'Ban'}</button>}</td></tr>)}</tbody></table></div>}
             
-            {/* ⚠️ REPORTS TAB - WITH REPLY BUTTON */}
+            {/* ⚠️ REPORTS TAB */}
             {activeTab === 'reports' && (
                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-x-auto border dark:border-slate-700 animate-in fade-in">
                     <table className="w-full text-left min-w-[800px]">
@@ -229,7 +221,8 @@ export default function AdminDashboard() {
                     <select className="w-full p-2 border rounded dark:bg-slate-700 dark:text-white" value={newsForm.category_id} onChange={e=>setNewsForm({...newsForm, category_id:e.target.value})}>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select>
                     <div className={`h-40 border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer ${dragActive?'border-blue-500 bg-blue-50':''}`} onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop} onClick={()=>fileInputRef.current.click()}>{newsForm.image_url?<img src={newsForm.image_url} className="h-full w-full object-cover"/>:<div className="text-center"><UploadCloud/><p>Upload Image</p></div>}<input ref={fileInputRef} type="file" hidden accept="image/*" onChange={handleFileChange}/></div>
                     <div className="border rounded-lg overflow-hidden">
-                        <Editor apiKey={import.meta.env.VITE_TINYMCE_API_KEY} onInit={(evt, editor) => editorRef.current = editor} initialValue={newsForm.content} init={{ height: 400, menubar: false, plugins: ['image', 'link', 'lists', 'table'], toolbar: 'undo redo | bold italic | alignleft aligncenter | bullist numlist | link image' }} />
+                        {/* ✅ ใช้คีย์ ty1y0... ที่คุณระบุ */}
+                        <Editor apiKey="ty1y0bweonlgsxi46gf4sk9olwcqgnkczuacoq5do8q7dz9p" onInit={(evt, editor) => editorRef.current = editor} initialValue={newsForm.content} init={{ height: 400, menubar: false, plugins: ['image', 'link', 'lists', 'table'], toolbar: 'undo redo | bold italic | alignleft aligncenter | bullist numlist | link image' }} />
                     </div>
                     <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded font-bold">บันทึก</button>
                 </form>
@@ -237,27 +230,18 @@ export default function AdminDashboard() {
         </div>
       )}
       
-      {/* 💬 Reply Modal (Chat Style) */}
+      {/* 💬 Reply Modal */}
       {isReplyModalOpen && selectedReport && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in zoom-in">
               <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col">
                   <div className="bg-blue-600 p-4 text-white flex justify-between items-center"><h3 className="font-bold flex items-center gap-2"><MessageCircle/> Reply to User</h3><button onClick={()=>setIsReplyModalOpen(false)}>✕</button></div>
                   <div className="p-4 flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900/50 max-h-[60vh]">
-                      <div className="flex gap-3 mb-4">
-                          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold text-gray-600 shrink-0">U</div>
-                          <div className="bg-white dark:bg-slate-700 p-3 rounded-r-xl rounded-bl-xl shadow-sm border dark:border-slate-600 max-w-[85%]">
-                              <p className="text-xs font-bold text-gray-500 mb-1">{selectedReport.topic}</p>
-                              <p className="text-sm dark:text-white">{selectedReport.description}</p>
-                          </div>
-                      </div>
+                      <div className="flex gap-3 mb-4"><div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center font-bold text-gray-600 shrink-0">U</div><div className="bg-white dark:bg-slate-700 p-3 rounded-r-xl rounded-bl-xl shadow-sm border dark:border-slate-600 max-w-[85%]"><p className="text-xs font-bold text-gray-500 mb-1">{selectedReport.topic}</p><p className="text-sm dark:text-white">{selectedReport.description}</p></div></div>
                   </div>
                   <div className="p-4 bg-white dark:bg-slate-800 border-t dark:border-slate-700">
                       <label className="text-xs font-bold text-gray-500 mb-1 block">Your Reply (Admin):</label>
                       <textarea rows="3" className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:text-white dark:border-slate-600 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Type your reply here..." value={replyText} onChange={(e)=>setReplyText(e.target.value)}></textarea>
-                      <div className="flex justify-end gap-2 mt-2">
-                          <button onClick={()=>setIsReplyModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
-                          <button onClick={handleSubmitReply} className="px-4 py-2 text-sm bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Send Reply</button>
-                      </div>
+                      <div className="flex justify-end gap-2 mt-2"><button onClick={()=>setIsReplyModalOpen(false)} className="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded">Cancel</button><button onClick={handleSubmitReply} className="px-4 py-2 text-sm bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Send Reply</button></div>
                   </div>
               </div>
           </div>

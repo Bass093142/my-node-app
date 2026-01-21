@@ -14,6 +14,7 @@ export default function Register() {
     gender: 'ชาย',
     phone: '',
     email: '',
+    pet_name: '', // ✅ เพิ่มค่า state สำหรับชื่อสัตว์เลี้ยง
     password: '',
     confirmPassword: ''
   });
@@ -117,6 +118,13 @@ export default function Register() {
             <div>
                 <label className={labelClass}>อีเมล</label>
                 <input name="email" type="email" required placeholder="name@example.com" onChange={handleChange} className={inputClass} />
+            </div>
+
+            {/* ✅ เพิ่มช่องชื่อสัตว์เลี้ยง (สำหรับกู้รหัสผ่าน) */}
+            <div>
+                <label className={labelClass}>ชื่อสัตว์เลี้ยง (สำหรับกู้รหัสผ่าน)</label>
+                <input name="pet_name" type="text" required placeholder="เช่น เจ้าตูบ, มอมแมม" onChange={handleChange} className={inputClass} />
+                <p className="text-xs text-gray-500 mt-1 dark:text-gray-400">*สำคัญ: ใช้สำหรับยืนยันตัวตนเมื่อลืมรหัสผ่าน</p>
             </div>
 
             {/* รหัสผ่าน */}
