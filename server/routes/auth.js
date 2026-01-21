@@ -8,34 +8,26 @@ const db = require('../config/db');
 router.post('/register', async (req, res) => {
     const { email, password, first_name, last_name, prefix, pet_name } = req.body;
     
-    // เช็คข้อมูลครบไหม
     if (!email || !password || !first_name || !pet_name) {
         return res.status(400).json({ message: 'กรุณากรอกข้อมูลให้ครบถ้วน (โดยเฉพาะชื่อสัตว์เลี้ยง)' });
     }
 
     try {
-        // เช็คอีเมลซ้ำ
         const [existing] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         if (existing.length > 0) {
             return res.status(400).json({ message: 'อีเมลนี้ถูกใช้งานแล้ว' });
         }
 
-        // บันทึกข้อมูล (role default = 'user')
         await db.query(
             'INSERT INTO users (email, password, first_name, last_name, prefix, pet_name, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
             [email, password, first_name, last_name, prefix, pet_name, 'user']
         );
-        
-        res.json({ message: 'สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ' });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'เกิดข้อผิดพลาดในการสมัครสมาชิก' });
-    }
+        res.json({ message: 'สมัครสมาชิกสำเร็จ' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ==========================================
-// 🔑 2. เข้าสู่ระบบ (Login) + เช็คแบน
+// 🔑 2. เข้าสู่ระบบ (Login)
 // ==========================================
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
@@ -43,69 +35,72 @@ router.post('/login', async (req, res) => {
         const [users] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
         const user = users[0];
 
-        // 1. ไม่พบผู้ใช้
-        if (!user) {
-            return res.status(404).json({ message: 'ไม่พบอีเมลนี้ในระบบ' });
-        }
+        if (!user) return res.status(404).json({ message: 'ไม่พบอีเมลนี้' });
 
-        // 🛑 2. เช็คว่าโดนแบนไหม (สำคัญ!)
         if (user.is_banned) {
             return res.status(403).json({ 
-                message: `บัญชีของคุณถูกระงับการใช้งาน!`,
-                reason: user.ban_reason || 'ละเมิดกฎการใช้งานชุมชน'
+                message: `บัญชีถูกระงับ: ${user.ban_reason || 'ละเมิดกฎการใช้งาน'}` 
             });
         }
 
-        // 3. เช็ครหัสผ่าน
-        if (password !== user.password) {
-            return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
-        }
+        if (password !== user.password) return res.status(401).json({ message: 'รหัสผ่านไม่ถูกต้อง' });
 
-        // สร้าง Token แบบง่าย (ใช้ User ID ต่อท้าย)
         const token = 'mock-jwt-token-' + user.id;
-        
-        // ส่งข้อมูลกลับ (ตัด password ออกเพื่อความปลอดภัย)
         const { password: _, ...userData } = user;
         
-        res.json({ 
-            message: 'เข้าสู่ระบบสำเร็จ', 
-            token, 
-            user: userData 
-        });
+        res.json({ message: 'เข้าสู่ระบบสำเร็จ', token, user: userData });
+
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
+// 👤 3. แก้ไขข้อมูลส่วนตัว + อัปโหลดรูป (Update Profile) ✅ เพิ่มใหม่
+// ==========================================
+router.put('/profile', async (req, res) => {
+    const { id, first_name, last_name, password, profile_image } = req.body;
+
+    try {
+        // 1. เตรียม SQL พื้นฐาน (แก้ชื่อ, นามสกุล, รูปภาพ)
+        let sql = 'UPDATE users SET first_name = ?, last_name = ?, profile_image = ?';
+        let params = [first_name, last_name, profile_image];
+
+        // 2. ถ้ามีการส่งรหัสผ่านใหม่มา ให้เพิ่มเข้าไปใน SQL
+        if (password && password.trim() !== '') {
+            sql += ', password = ?';
+            params.push(password);
+        }
+
+        // 3. ระบุว่าแก้ ID ไหน
+        sql += ' WHERE id = ?';
+        params.push(id);
+
+        // 4. บันทึกลงฐานข้อมูล
+        await db.query(sql, params);
+
+        // 5. ดึงข้อมูลล่าสุดส่งกลับไปหน้าบ้าน (เพื่อให้ LocalStorage อัปเดตทันที)
+        const [updatedUser] = await db.query('SELECT * FROM users WHERE id = ?', [id]);
+        const { password: _, ...userData } = updatedUser[0]; // ตัด password ออกก่อนส่งกลับ
+
+        res.json({ message: 'บันทึกข้อมูลเรียบร้อย', user: userData });
 
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ' });
+        res.status(500).json({ error: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล' });
     }
 });
 
 // ==========================================
-// 🔄 3. กู้คืนรหัสผ่าน (Reset Password)
+// 🔄 4. กู้คืนรหัสผ่าน (Reset Password)
 // ==========================================
 router.post('/reset-password', async (req, res) => {
     const { email, pet_name, new_password } = req.body;
-    
-    if (!email || !pet_name || !new_password) {
-        return res.status(400).json({ message: 'ข้อมูลไม่ครบถ้วน' });
-    }
-
     try {
-        // เช็คว่า Email และ ชื่อสัตว์เลี้ยง ตรงกันไหม
         const [users] = await db.query('SELECT * FROM users WHERE email = ? AND pet_name = ?', [email, pet_name]);
-        
-        if (users.length === 0) {
-            return res.status(400).json({ message: 'ข้อมูลยืนยันตัวตนไม่ถูกต้อง (ชื่อสัตว์เลี้ยงผิด)' });
-        }
+        if (users.length === 0) return res.status(400).json({ message: 'ข้อมูลไม่ถูกต้อง' });
 
-        // อัปเดตรหัสผ่านใหม่
         await db.query('UPDATE users SET password = ? WHERE id = ?', [new_password, users[0].id]);
-        
-        res.json({ message: 'เปลี่ยนรหัสผ่านเรียบร้อยแล้ว! กรุณาเข้าสู่ระบบใหม่' });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'เปลี่ยนรหัสผ่านไม่สำเร็จ' });
-    }
+        res.json({ message: 'เปลี่ยนรหัสผ่านสำเร็จ' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 module.exports = router;
