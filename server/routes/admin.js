@@ -1,60 +1,69 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../config/db'); 
+const db = require('../config/db');
 
 // ==========================================
-// 👥 1. จัดการผู้ใช้งาน (User Management)
+// 📊 1. Dashboard Stats (สำหรับกราฟและตัวเลข)
 // ==========================================
-
-// ดึงรายชื่อ User ทั้งหมด
-router.get('/users', async (req, res) => {
+router.get('/stats', async (req, res) => {
     try {
-        // ดึงข้อมูลรวมถึงรูปโปรไฟล์และเหตุผลการแบน
-        const sql = `
-            SELECT id, email, first_name, last_name, role, is_banned, ban_reason, profile_image, phone, created_at 
-            FROM users 
-            ORDER BY created_at DESC
-        `;
-        const [users] = await db.query(sql);
-        res.json(users);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'ดึงข้อมูลผู้ใช้ไม่สำเร็จ' });
+        const [users] = await db.query('SELECT COUNT(*) as count FROM users');
+        const [news] = await db.query('SELECT COUNT(*) as count FROM news');
+        const [reports] = await db.query('SELECT COUNT(*) as count FROM reports WHERE status = "pending"');
+        
+        res.json({ 
+            users: users[0].count, 
+            news: news[0].count, 
+            reports: reports[0].count 
+        });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
-// แบน / ปลดแบน (พร้อมบันทึกเหตุผล)
+// ==========================================
+// 👥 2. User Management (จัดการผู้ใช้)
+// ==========================================
+
+// ดึงรายชื่อผู้ใช้ทั้งหมด
+router.get('/users', async (req, res) => {
+    try { 
+        const [rows] = await db.query('SELECT id, first_name, last_name, email, role, profile_image, is_banned, ban_reason, created_at FROM users ORDER BY created_at DESC'); 
+        res.json(rows); 
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// สั่งแบน / ปลดแบน User
 router.put('/users/:id/ban', async (req, res) => {
     const { is_banned, ban_reason } = req.body;
-    try {
-        // ถ้าปลดแบน ให้เคลียร์เหตุผลเป็น NULL
-        const reason = is_banned ? ban_reason : null;
-        
+    try { 
         await db.query(
             'UPDATE users SET is_banned = ?, ban_reason = ? WHERE id = ?', 
-            [is_banned, reason, req.params.id]
-        );
-        res.json({ message: is_banned ? 'ระงับการใช้งานเรียบร้อย' : 'ปลดระงับเรียบร้อย' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+            [is_banned, ban_reason, req.params.id]
+        ); 
+        res.json({ message: 'อัปเดตสถานะการแบนเรียบร้อย' }); 
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
 // ลบ User ถาวร
 router.delete('/users/:id', async (req, res) => {
-    try {
-        await db.query('DELETE FROM users WHERE id = ?', [req.params.id]);
-        res.json({ message: 'ลบผู้ใช้งานเรียบร้อย' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    try { 
+        await db.query('DELETE FROM users WHERE id = ?', [req.params.id]); 
+        res.json({ message: 'ลบผู้ใช้เรียบร้อย' }); 
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
 // ==========================================
-// 📢 2. ระบบรายงานปัญหา (Report System)
+// ⚠️ 3. Report Management (จัดการแจ้งปัญหา)
 // ==========================================
 
-// ดูรายการแจ้งปัญหาทั้งหมด (Admin View)
+// ดึงรายการแจ้งปัญหาทั้งหมด (สำหรับ Admin)
 router.get('/reports', async (req, res) => {
     try {
         const sql = `
@@ -63,35 +72,63 @@ router.get('/reports', async (req, res) => {
             LEFT JOIN users u ON r.user_id = u.id 
             ORDER BY r.created_at DESC
         `;
-        const [reports] = await db.query(sql);
-        res.json(reports);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        const [rows] = await db.query(sql);
+        res.json(rows);
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
-// แจ้งปัญหา (User View - สำหรับให้ User ทั่วไปส่งเรื่อง)
+// เพิ่มรายงานปัญหา (User ส่งมา)
 router.post('/reports', async (req, res) => {
     const { user_id, topic, description } = req.body;
     try {
         await db.query(
-            'INSERT INTO reports (user_id, topic, description) VALUES (?, ?, ?)',
+            'INSERT INTO reports (user_id, topic, description) VALUES (?, ?, ?)', 
             [user_id, topic, description]
         );
-        res.json({ message: 'ส่งรายงานเรียบร้อยแล้ว' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.json({ message: 'ส่งเรื่องแจ้งปัญหาเรียบร้อย' });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
-// อัปเดตสถานะงาน (เช่น รับเรื่องแล้ว / แก้เสร็จแล้ว)
+// อัปเดตสถานะ (เช่น รอตรวจสอบ -> ปิดงาน)
 router.put('/reports/:id/status', async (req, res) => {
-    const { status } = req.body; // status: 'pending', 'resolved', 'closed'
+    const { status } = req.body;
+    try { 
+        await db.query('UPDATE reports SET status = ? WHERE id = ?', [status, req.params.id]); 
+        res.json({ message: 'อัปเดตสถานะงานแล้ว' }); 
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// ✅ ตอบกลับ User (Reply System)
+// ฟังก์ชันนี้สำคัญ: จะบันทึกคำตอบลงฐานข้อมูล และเปลี่ยนสถานะเป็น "resolved" (แก้ไขแล้ว) ทันที
+router.put('/reports/:id/reply', async (req, res) => {
+    const { reply } = req.body;
     try {
-        await db.query('UPDATE reports SET status = ? WHERE id = ?', [status, req.params.id]);
-        res.json({ message: 'อัปเดตสถานะงานแล้ว' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        await db.query(
+            'UPDATE reports SET admin_reply = ?, status = ? WHERE id = ?', 
+            [reply, 'resolved', req.params.id]
+        );
+        res.json({ message: 'ตอบกลับผู้ใช้เรียบร้อย' });
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
+    }
+});
+
+// ✅ ดึงประวัติการแจ้งปัญหาของ User คนเดียว (สำหรับหน้า Home ของ User)
+router.get('/reports/user/:userId', async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            'SELECT * FROM reports WHERE user_id = ? ORDER BY created_at DESC', 
+            [req.params.userId]
+        );
+        res.json(rows);
+    } catch (err) { 
+        res.status(500).json({ error: err.message }); 
     }
 });
 
