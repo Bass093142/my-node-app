@@ -28,7 +28,14 @@ const translations = {
     submit: "ส่งข้อมูล",
     cancel: "ยกเลิก",
     sentSuccess: "ส่งข้อมูลเรียบร้อย",
-    loginFirst: "กรุณาเข้าสู่ระบบก่อน"
+    loginFirst: "กรุณาเข้าสู่ระบบก่อน",
+    newsNotFound: "ไม่พบข่าว",
+    aiSummary: "สรุปโดย AI",
+    aiReading: "AI กำลังอ่านข่าว...",
+    aiSummarizeBtn: "ให้ AI สรุปเนื้อหาข่าวนี้",
+    backHome: "กลับหน้าหลัก",
+    reportContent: "แจ้งเนื้อหาไม่เหมาะสม",
+    reportThanks: "ขอบคุณ เราได้รับรายงานของคุณแล้ว"
   },
   en: {
     home: "Home",
@@ -54,7 +61,14 @@ const translations = {
     submit: "Submit",
     cancel: "Cancel",
     sentSuccess: "Sent Successfully",
-    loginFirst: "Please Login First"
+    loginFirst: "Please Login First",
+    newsNotFound: "News Not Found",
+    aiSummary: "AI Summary",
+    aiReading: "AI is reading...",
+    aiSummarizeBtn: "Summarize with AI",
+    backHome: "Back to Home",
+    reportContent: "Report Content",
+    reportThanks: "Thanks, report received"
   }
 };
 
