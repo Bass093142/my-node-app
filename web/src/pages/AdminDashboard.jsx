@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Chart from 'react-apexcharts'; // ✅ ต้อง Import ตัวนี้
+import Chart from 'react-apexcharts'; 
 import html2pdf from 'html2pdf.js';
 import Swal from 'sweetalert2';
 import { Editor } from '@tinymce/tinymce-react'; 
@@ -116,7 +116,20 @@ export default function AdminDashboard() {
 
   const handleBanUser = async (id, s) => { if(!s){const{value:r}=await Swal.fire({title:'ระบุเหตุผลการแบน',input:'text',showCancelButton:true,confirmButtonColor:'#d33'});if(r)await updateBan(id,true,r);}else{await updateBan(id,false,null);} };
   const updateBan = async (id,s,r) => { await fetch(`${apiUrl}/api/admin/users/${id}/ban`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_banned:s,ban_reason:r})}); fetchData(); };
-  const handleDeleteUser = async (id) => { if((await Swal.fire({title:'ลบผู้ใช้?',icon:'warning',showCancelButton:true,confirmButtonColor:'#d33'})).isConfirmed){await fetch(`${apiUrl}/api/admin/users/${id}`,{method:'DELETE'});fetchData();} };
+  
+  // ✅ แก้ไข: ลบ User ได้ทุกคน (ยกเว้นตัวเอง)
+  const handleDeleteUser = async (id) => { 
+      if((await Swal.fire({
+          title: 'ลบผู้ใช้ถาวร?',
+          text: "ข่าวและโพสต์ของผู้นี้จะไม่หายไป แต่บัญชีจะถูกลบ",
+          icon:'warning',
+          showCancelButton:true,
+          confirmButtonColor:'#d33'
+      })).isConfirmed){
+          await fetch(`${apiUrl}/api/admin/users/${id}`,{method:'DELETE'});
+          fetchData();
+      } 
+  };
   
   const handleUpdateReport = async (id, s) => { await fetch(`${apiUrl}/api/admin/reports/${id}/status`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ status: s }) }); fetchData(); };
   const handleOpenReply = (report) => { setSelectedReport(report); setReplyText(report.admin_reply || ''); setIsReplyModalOpen(true); };
@@ -139,7 +152,6 @@ export default function AdminDashboard() {
   const filteredReports = filterByMonth(reports);
   const filteredUsers = filterByMonth(users);
   
-  // เตรียมข้อมูลกราฟ
   const viewSeries = categories.map(c => filteredNews.filter(n => n.category_id === c.id).reduce((sum, n) => sum + (n.view_count || 0), 0));
   const countSeries = categories.map(c => filteredNews.filter(n => n.category_id === c.id).length);
 
@@ -199,47 +211,19 @@ export default function AdminDashboard() {
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border-l-4 border-yellow-500"><h3>แจ้ง {filteredReports.length}</h3></div>
                   </div>
                   
-                  {/* ✅ Charts (เติมส่วนที่หายไปกลับมาแล้ว) */}
+                  {/* Charts */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm">
                           <h3 className="font-bold mb-4 dark:text-white">ยอดวิวรายหมวด</h3>
-                          <Chart 
-                            type="bar" 
-                            height={300} 
-                            options={{ 
-                                chart:{toolbar:{show:false}}, 
-                                xaxis:{categories:categories.map(c=>c.name)}, 
-                                colors:['#3b82f6'] 
-                            }} 
-                            series={[{name:'Views',data:viewSeries}]} 
-                          />
+                          <Chart type="bar" height={300} options={{ chart:{toolbar:{show:false}}, xaxis:{categories:categories.map(c=>c.name)}, colors:['#3b82f6'] }} series={[{name:'Views',data:viewSeries}]} />
                       </div>
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm">
                           <h3 className="font-bold mb-4 dark:text-white">สัดส่วนข่าว</h3>
-                          <Chart 
-                             type="donut" 
-                             height={300} 
-                             options={{ 
-                                labels:categories.map(c=>c.name), 
-                                colors:['#3b82f6','#8b5cf6','#10b981','#f59e0b'] 
-                             }} 
-                             series={countSeries} 
-                           />
+                          <Chart type="donut" height={300} options={{ labels:categories.map(c=>c.name), colors:['#3b82f6','#8b5cf6','#10b981','#f59e0b'] }} series={countSeries} />
                       </div>
                       <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm lg:col-span-2">
                           <h3 className="font-bold mb-4 dark:text-white">แนวโน้มยอดวิวรายสัปดาห์</h3>
-                          <Chart 
-                             type="area" 
-                             height={300} 
-                             options={{ 
-                                chart:{toolbar:{show:false}}, 
-                                xaxis:{categories:['Week 1','Week 2','Week 3','Week 4']}, 
-                                stroke:{curve:'smooth'}, 
-                                colors:['#10b981'], 
-                                fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.9, stops: [0, 90, 100] } } 
-                             }} 
-                             series={[{name:'Views',data:[30,40,35,50]}]} 
-                           />
+                          <Chart type="area" height={300} options={{ chart:{toolbar:{show:false}}, xaxis:{categories:['Week 1','Week 2','Week 3','Week 4']}, stroke:{curve:'smooth'}, colors:['#10b981'], fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.7, opacityTo: 0.9, stops: [0, 90, 100] } } }} series={[{name:'Views',data:[30,40,35,50]}]} />
                       </div>
                   </div>
                </div>
@@ -251,20 +235,40 @@ export default function AdminDashboard() {
             {/* 🏷️ CATEGORIES TAB */}
             {activeTab === 'categories' && <div className="space-y-6 animate-in fade-in"><div className="flex justify-between"><h2 className="text-2xl font-bold dark:text-white">🏷️ หมวดหมู่</h2><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(false);setCatForm({name:''})}} className="bg-purple-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่ม</button></div><div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden"><table className="w-full text-left"><thead className="bg-purple-50 dark:bg-slate-700"><tr><th className="p-4">Name</th><th className="p-4 text-center">Action</th></tr></thead><tbody className="divide-y dark:divide-slate-700">{categories.map(c=><tr key={c.id}><td className="p-4 dark:text-white">{c.name}</td><td className="p-4 flex justify-center gap-2"><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(true);setCurrentId(c.id);setCatForm({name:c.name})}} className="text-yellow-600">Edit</button><button onClick={()=>handleDeleteCat(c.id)} className="text-red-600">Delete</button></td></tr>)}</tbody></table></div></div>}
             
-            {/* 👥 USERS TAB (เฉพาะ Admin เท่านั้นที่เห็นและใช้งานได้) */}
+            {/* 👥 USERS TAB (เฉพาะ Admin) */}
             {activeTab === 'users' && currentUser?.role === 'admin' && (
               <div className="bg-white dark:bg-slate-800 rounded shadow overflow-x-auto">
                 <table className="w-full text-left min-w-[700px]">
                   <thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Reason</th><th className="p-4">Action</th></tr></thead>
                   <tbody>{users.map(u=><tr key={u.id} className="border-t dark:border-slate-700"><td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td>
                   <td className="p-4">
+                    {/* เปลี่ยน Role ได้ */}
                     <select value={u.role} onChange={(e)=>handleUpdateRole(u.id, e.target.value)} disabled={u.id === currentUser.id} className="border rounded p-1 text-sm dark:bg-slate-600 dark:text-white">
                       <option value="user">User</option>
                       <option value="officer">Officer</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>
-                  <td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td><td className="p-4">{u.role!=='admin'&&<button onClick={()=>handleBanUser(u.id,u.is_banned)} className="text-xs border px-2 py-1 rounded">{u.is_banned?'Unlock':'Ban'}</button>}</td></tr>)}</tbody>
+                  <td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td>
+                  
+                  {/* ✅ ปลดล็อคปุ่ม Action: แบนได้ทุกคน / ลบได้ทุกคน (ยกเว้นตัวเอง) */}
+                  <td className="p-4 flex gap-2">
+                     <button 
+                        onClick={()=>handleBanUser(u.id,u.is_banned)} 
+                        disabled={u.id === currentUser.id}
+                        className={`text-xs border px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 dark:hover:bg-slate-600'}`}
+                     >
+                        {u.is_banned?'Unlock':'Ban'}
+                     </button>
+                     <button 
+                        onClick={()=>handleDeleteUser(u.id)} 
+                        disabled={u.id === currentUser.id}
+                        className={`text-xs border border-red-200 text-red-600 px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}
+                     >
+                        <Trash2 size={14}/>
+                     </button>
+                  </td>
+                  </tr>)}</tbody>
                 </table>
               </div>
             )}
