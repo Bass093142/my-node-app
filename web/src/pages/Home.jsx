@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { Calendar, Eye, ArrowRight, ImageOff, MessageSquareWarning, History, Moon, Sun, Globe, X, Search } from 'lucide-react';
+import { 
+  Calendar, Eye, ArrowRight, ImageOff, MessageSquareWarning, History, 
+  Moon, Sun, Globe, X, Search, ChevronLeft, ChevronRight 
+} from 'lucide-react';
 import { useConfig } from '../context/ConfigContext'; 
 
 export default function Home() {
@@ -11,8 +14,15 @@ export default function Home() {
   
   const [newsList, setNewsList] = useState([]);
   const [categories, setCategories] = useState([]);
+  
+  // State สำหรับ Filter & Search
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchQuery, setSearchQuery] = useState(''); // ✅ 1. เพิ่ม State สำหรับเก็บคำค้นหา
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // ✅ State สำหรับ Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // แสดงหน้าละ 6 ข่าว
+
   const [myReports, setMyReports] = useState([]);
   const [showReportModal, setShowReportModal] = useState(false);
   
@@ -21,6 +31,11 @@ export default function Home() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // เมื่อเปลี่ยนหมวดหมู่หรือคำค้นหา ให้กลับไปหน้า 1 เสมอ
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategory, searchQuery]);
 
   const fetchData = async () => {
     try {
@@ -69,17 +84,21 @@ export default function Home() {
     }
   };
 
-  // ✅ 2. อัปเกรด Logic การกรองข่าว (กรองทั้งหมวดหมู่ และ คำค้นหา พร้อมกัน)
+  // 1. กรองข่าวทั้งหมด (Filter Logic)
   const filteredNews = newsList.filter(n => {
-      // เงื่อนไขที่ 1: เช็คหมวดหมู่
       const matchesCategory = selectedCategory === 'all' || n.category_id === parseInt(selectedCategory);
-      
-      // เงื่อนไขที่ 2: เช็คคำค้นหา (ค้นหาจาก Title)
       const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
-
-      // ต้องผ่านทั้ง 2 เงื่อนไขถึงจะแสดง
       return matchesCategory && matchesSearch;
   });
+
+  // ✅ 2. คำนวณ Pagination (ตัดแบ่งข่าวตามหน้า)
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentNews = filteredNews.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredNews.length / itemsPerPage);
+
+  // ฟังก์ชันเปลี่ยนหน้า
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
     <div className="font-sarabun min-h-screen pb-20 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
@@ -103,7 +122,7 @@ export default function Home() {
 
       <div className="container mx-auto p-4 space-y-6">
         
-        {/* ✅ 3. เพิ่มช่องค้นหา (Search Bar) */}
+        {/* Search Bar */}
         <div className="relative max-w-md mx-auto md:mx-0">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <Search size={20} />
@@ -123,10 +142,10 @@ export default function Home() {
             {categories.map(c=><button key={c.id} onClick={()=>setSelectedCategory(c.id)} className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory===c.id?'bg-blue-600 text-white shadow-lg transform scale-105':'bg-white dark:bg-slate-800 dark:text-white hover:bg-gray-100'}`}>{c.name}</button>)}
         </div>
 
-        {/* News Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredNews.length > 0 ? (
-                filteredNews.map(n => (
+        {/* ✅ News Grid (แสดงเฉพาะ currentNews ที่ถูกแบ่งหน้าแล้ว) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[400px]">
+            {currentNews.length > 0 ? (
+                currentNews.map(n => (
                     <div key={n.id} className="group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-2xl overflow-hidden flex flex-col h-full border border-gray-100 dark:border-slate-700 transition-all duration-300 transform hover:-translate-y-1">
                         <div className="relative w-full h-64 bg-gray-100 dark:bg-slate-700 overflow-hidden flex items-center justify-center">
                             {n.image_url ? 
@@ -152,6 +171,42 @@ export default function Home() {
                 </div>
             )}
         </div>
+
+        {/* ✅ Pagination Controls (ตัวแบ่งหน้า) */}
+        {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-2 mt-8 pt-6 border-t dark:border-slate-700">
+                <button 
+                    onClick={() => paginate(currentPage - 1)} 
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg border dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                    <ChevronLeft size={20} className="dark:text-white"/>
+                </button>
+                
+                {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                        key={i + 1}
+                        onClick={() => paginate(i + 1)}
+                        className={`w-10 h-10 rounded-lg font-bold text-sm transition-all ${
+                            currentPage === i + 1 
+                                ? 'bg-blue-600 text-white shadow-lg scale-105' 
+                                : 'bg-white dark:bg-slate-800 dark:text-white border dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700'
+                        }`}
+                    >
+                        {i + 1}
+                    </button>
+                ))}
+
+                <button 
+                    onClick={() => paginate(currentPage + 1)} 
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg border dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                    <ChevronRight size={20} className="dark:text-white"/>
+                </button>
+            </div>
+        )}
+
       </div>
 
       {/* Floating Report Button */}
