@@ -38,7 +38,7 @@ router.get('/users', async (req, res) => {
 
 // 2.2 เปลี่ยนสิทธิ์ผู้ใช้งาน (Change Role)
 router.put('/users/:id/role', async (req, res) => {
-    const { role } = req.body; // รับค่า: 'user', 'officer', 'admin'
+    const { role } = req.body; 
     
     if (!['user', 'officer', 'admin'].includes(role)) {
         return res.status(400).json({ message: 'ค่า Role ไม่ถูกต้อง' });
@@ -66,26 +66,13 @@ router.put('/users/:id/ban', async (req, res) => {
     }
 });
 
-// 2.4 🗑️ ลบ User ถาวร (แก้ Error 500 ติด Foreign Key) ✅
+// 2.4 🗑️ ลบ User ถาวร (ใช้ความสามารถของ SQL จัดการข้อมูลที่ผูกมัด) ✅
 router.delete('/users/:id', async (req, res) => {
-    const userId = req.params.id;
     try { 
-        // 1. ปลดความเป็นเจ้าของข่าว (News) -> ให้ user_id เป็น NULL
-        await db.query('UPDATE news SET user_id = NULL WHERE user_id = ?', [userId]);
-
-        // 2. ปลดความเป็นเจ้าของคอมเมนต์ (Comments) -> ให้ user_id เป็น NULL (ถ้ามีตารางนี้)
-        try { await db.query('UPDATE comments SET user_id = NULL WHERE user_id = ?', [userId]); } catch(e) {}
-
-        // 3. ปลดความเป็นเจ้าของรายงานปัญหา (Reports) -> ให้ user_id เป็น NULL
-        try { await db.query('UPDATE reports SET user_id = NULL WHERE user_id = ?', [userId]); } catch(e) {}
-
-        // 4. ปลด Log (Cookie Logs) -> ให้ user_id เป็น NULL
-        try { await db.query('UPDATE cookie_logs SET user_id = NULL WHERE user_id = ?', [userId]); } catch(e) {}
-
-        // 5. เมื่อไม่มีตารางไหนผูกมัดแล้ว -> ลบ User ได้เลย!
-        await db.query('DELETE FROM users WHERE id = ?', [userId]); 
+        // สั่งลบได้เลย! Database จะเปลี่ยน user_id ในตารางอื่นให้เป็น NULL เอง (ตามที่คุณตั้งค่าใน SQL)
+        await db.query('DELETE FROM users WHERE id = ?', [req.params.id]); 
         
-        res.json({ message: 'ลบผู้ใช้เรียบร้อย (ข้อมูลต่างๆ ของผู้ใช้ถูกเก็บไว้แต่ไม่มีเจ้าของ)' }); 
+        res.json({ message: 'ลบผู้ใช้เรียบร้อย (โพสต์และประวัติยังถูกเก็บไว้)' }); 
     } catch (err) { 
         console.error("Delete Error:", err);
         res.status(500).json({ error: 'ลบไม่ได้: ' + err.message }); 
