@@ -6,7 +6,8 @@ import Swal from 'sweetalert2';
 import { Editor } from '@tinymce/tinymce-react'; 
 import { 
   LayoutDashboard, Newspaper, Users, AlertTriangle, LogOut, 
-  Menu, X, Plus, Image as ImageIcon, Edit, Trash2, FileText, UploadCloud, Tags, MessageCircle, Send
+  Menu, X, Plus, Image as ImageIcon, Edit, Trash2, FileText, UploadCloud, 
+  Tags, MessageCircle, Send, ChevronLeft, ChevronRight 
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -21,6 +22,10 @@ export default function AdminDashboard() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+
+  // ✅ State สำหรับ Pagination (เพิ่มใหม่)
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // กำหนดให้แสดงหน้าละ 10 รายการ
   
   // --- Data State ---
   const [users, setUsers] = useState([]);
@@ -44,7 +49,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem('user'));
-    // ✅ เช็คสิทธิ์: ต้องเป็น admin หรือ officer เท่านั้น
+    // เช็คสิทธิ์: ต้องเป็น admin หรือ officer เท่านั้น
     if (!user || (user.role !== 'admin' && user.role !== 'officer')) {
       Swal.fire('Access Denied', 'คุณไม่มีสิทธิ์เข้าถึงหน้านี้', 'error');
       navigate('/');
@@ -54,6 +59,11 @@ export default function AdminDashboard() {
       fetchData();
     }
   }, [navigate]);
+
+  // ✅ รีเซ็ตหน้าเป็น 1 เมื่อเปลี่ยน Tab
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab]);
 
   const fetchData = async () => {
     try {
@@ -117,7 +127,6 @@ export default function AdminDashboard() {
   const handleBanUser = async (id, s) => { if(!s){const{value:r}=await Swal.fire({title:'ระบุเหตุผลการแบน',input:'text',showCancelButton:true,confirmButtonColor:'#d33'});if(r)await updateBan(id,true,r);}else{await updateBan(id,false,null);} };
   const updateBan = async (id,s,r) => { await fetch(`${apiUrl}/api/admin/users/${id}/ban`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({is_banned:s,ban_reason:r})}); fetchData(); };
   
-  // ✅ แก้ไข: ลบ User ได้ทุกคน (ยกเว้นตัวเอง)
   const handleDeleteUser = async (id) => { 
       if((await Swal.fire({
           title: 'ลบผู้ใช้ถาวร?',
@@ -163,6 +172,40 @@ export default function AdminDashboard() {
       ...(currentUser?.role === 'admin' ? [{id:'users',icon:Users,l:'ผู้ใช้งาน'}] : []),
       {id:'reports',icon:AlertTriangle,l:'แจ้งปัญหา'}
   ];
+
+  // ✅ Helper Component: ปุ่มเปลี่ยนหน้า (Pagination Controls)
+  const PaginationControls = ({ totalItems }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (totalPages <= 1) return null;
+
+    return (
+        <div className="flex justify-center items-center gap-2 mt-6 pt-4 border-t dark:border-slate-700">
+            <button 
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 border rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:hover:bg-slate-700 disabled:opacity-50 dark:text-white"
+            >
+                <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-bold dark:text-gray-300">
+                หน้าที่ {currentPage} จาก {totalPages}
+            </span>
+            <button 
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-2 border rounded-lg hover:bg-gray-100 dark:border-slate-600 dark:hover:bg-slate-700 disabled:opacity-50 dark:text-white"
+            >
+                <ChevronRight size={16} />
+            </button>
+        </div>
+    );
+  };
+
+  // ✅ Helper Function: ตัดข้อมูลตามหน้า
+  const paginateData = (data) => {
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      return data.slice(startIndex, startIndex + itemsPerPage);
+  };
 
   return (
     <div className="flex h-screen w-full bg-gray-50 dark:bg-slate-900 font-sarabun overflow-hidden relative">
@@ -229,77 +272,119 @@ export default function AdminDashboard() {
                </div>
             )}
             
-            {/* 📰 NEWS TAB */}
-            {activeTab === 'news' && <div className="space-y-6 animate-in fade-in"><div className="flex justify-between"><h2 className="text-2xl font-bold dark:text-white">📰 จัดการข่าว</h2><button onClick={()=>handleOpenNewsModal(null)} className="bg-blue-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่มข่าว</button></div><div className="grid grid-cols-1 md:grid-cols-3 gap-6">{newsList.map(n=><div key={n.id} className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border dark:border-slate-700 flex flex-col"><div className="h-48 relative bg-gray-200">{n.image_url&&<img src={n.image_url} className="w-full h-full object-cover"/>}</div><div className="p-4 flex-1"><h3 className="font-bold dark:text-white line-clamp-2">{n.title}</h3><div className="mt-3 flex justify-end gap-2"><button onClick={()=>handleOpenNewsModal(n)} className="text-yellow-600 p-2"><Edit size={18}/></button><button onClick={()=>handleDeleteNews(n.id)} className="text-red-600 p-2"><Trash2 size={18}/></button></div></div></div>)}</div></div>}
+            {/* 📰 NEWS TAB (พร้อม Pagination) */}
+            {activeTab === 'news' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="flex justify-between">
+                        <h2 className="text-2xl font-bold dark:text-white">📰 จัดการข่าว</h2>
+                        <button onClick={()=>handleOpenNewsModal(null)} className="bg-blue-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่มข่าว</button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {paginateData(newsList).map(n=>(
+                            <div key={n.id} className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden border dark:border-slate-700 flex flex-col">
+                                <div className="h-48 relative bg-gray-200">
+                                    {n.image_url&&<img src={n.image_url} className="w-full h-full object-cover"/>}
+                                </div>
+                                <div className="p-4 flex-1">
+                                    <h3 className="font-bold dark:text-white line-clamp-2">{n.title}</h3>
+                                    <div className="mt-3 flex justify-end gap-2">
+                                        <button onClick={()=>handleOpenNewsModal(n)} className="text-yellow-600 p-2"><Edit size={18}/></button>
+                                        <button onClick={()=>handleDeleteNews(n.id)} className="text-red-600 p-2"><Trash2 size={18}/></button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <PaginationControls totalItems={newsList.length} />
+                </div>
+            )}
             
-            {/* 🏷️ CATEGORIES TAB */}
-            {activeTab === 'categories' && <div className="space-y-6 animate-in fade-in"><div className="flex justify-between"><h2 className="text-2xl font-bold dark:text-white">🏷️ หมวดหมู่</h2><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(false);setCatForm({name:''})}} className="bg-purple-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่ม</button></div><div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden"><table className="w-full text-left"><thead className="bg-purple-50 dark:bg-slate-700"><tr><th className="p-4">Name</th><th className="p-4 text-center">Action</th></tr></thead><tbody className="divide-y dark:divide-slate-700">{categories.map(c=><tr key={c.id}><td className="p-4 dark:text-white">{c.name}</td><td className="p-4 flex justify-center gap-2"><button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(true);setCurrentId(c.id);setCatForm({name:c.name})}} className="text-yellow-600">Edit</button><button onClick={()=>handleDeleteCat(c.id)} className="text-red-600">Delete</button></td></tr>)}</tbody></table></div></div>}
+            {/* 🏷️ CATEGORIES TAB (พร้อม Pagination) */}
+            {activeTab === 'categories' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="flex justify-between">
+                        <h2 className="text-2xl font-bold dark:text-white">🏷️ หมวดหมู่</h2>
+                        <button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(false);setCatForm({name:''})}} className="bg-purple-600 text-white px-3 py-2 rounded flex gap-2"><Plus/> เพิ่ม</button>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-purple-50 dark:bg-slate-700"><tr><th className="p-4">Name</th><th className="p-4 text-center">Action</th></tr></thead>
+                            <tbody className="divide-y dark:divide-slate-700">
+                                {paginateData(categories).map(c=>(
+                                    <tr key={c.id}>
+                                        <td className="p-4 dark:text-white">{c.name}</td>
+                                        <td className="p-4 flex justify-center gap-2">
+                                            <button onClick={()=>{setIsCatModalOpen(true);setIsEditMode(true);setCurrentId(c.id);setCatForm({name:c.name})}} className="text-yellow-600">Edit</button>
+                                            <button onClick={()=>handleDeleteCat(c.id)} className="text-red-600">Delete</button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <PaginationControls totalItems={categories.length} />
+                </div>
+            )}
             
-            {/* 👥 USERS TAB (เฉพาะ Admin) */}
+            {/* 👥 USERS TAB (เฉพาะ Admin + Pagination) */}
             {activeTab === 'users' && currentUser?.role === 'admin' && (
               <div className="bg-white dark:bg-slate-800 rounded shadow overflow-x-auto">
                 <table className="w-full text-left min-w-[700px]">
                   <thead className="bg-gray-100 dark:bg-slate-700"><tr><th className="p-4">User</th><th className="p-4">Role</th><th className="p-4">Status</th><th className="p-4">Reason</th><th className="p-4">Action</th></tr></thead>
-                  <tbody>{users.map(u=><tr key={u.id} className="border-t dark:border-slate-700"><td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td>
-                  <td className="p-4">
-                    {/* เปลี่ยน Role ได้ */}
-                    <select value={u.role} onChange={(e)=>handleUpdateRole(u.id, e.target.value)} disabled={u.id === currentUser.id} className="border rounded p-1 text-sm dark:bg-slate-600 dark:text-white">
-                      <option value="user">User</option>
-                      <option value="officer">Officer</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td>
-                  
-                  {/* ✅ ปลดล็อคปุ่ม Action: แบนได้ทุกคน / ลบได้ทุกคน (ยกเว้นตัวเอง) */}
-                  <td className="p-4 flex gap-2">
-                     <button 
-                        onClick={()=>handleBanUser(u.id,u.is_banned)} 
-                        disabled={u.id === currentUser.id}
-                        className={`text-xs border px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 dark:hover:bg-slate-600'}`}
-                     >
-                        {u.is_banned?'Unlock':'Ban'}
-                     </button>
-                     <button 
-                        onClick={()=>handleDeleteUser(u.id)} 
-                        disabled={u.id === currentUser.id}
-                        className={`text-xs border border-red-200 text-red-600 px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}
-                     >
-                        <Trash2 size={14}/>
-                     </button>
-                  </td>
-                  </tr>)}</tbody>
+                  <tbody>
+                    {paginateData(users).map(u=>(
+                        <tr key={u.id} className="border-t dark:border-slate-700">
+                            <td className="p-4 flex items-center gap-2">{u.profile_image?<img src={u.profile_image} className="w-8 h-8 rounded-full"/>:<div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center font-bold">{u.first_name[0]}</div>}<div><p className="font-bold dark:text-white">{u.first_name}</p><p className="text-xs text-gray-500">{u.email}</p></div></td>
+                            <td className="p-4">
+                                <select value={u.role} onChange={(e)=>handleUpdateRole(u.id, e.target.value)} disabled={u.id === currentUser.id} className="border rounded p-1 text-sm dark:bg-slate-600 dark:text-white">
+                                <option value="user">User</option>
+                                <option value="officer">Officer</option>
+                                <option value="admin">Admin</option>
+                                </select>
+                            </td>
+                            <td className="p-4">{u.is_banned?<span className="text-red-500 font-bold">Banned</span>:<span className="text-green-500">Active</span>}</td><td className="p-4 text-xs text-red-400">{u.ban_reason||'-'}</td>
+                            <td className="p-4 flex gap-2">
+                                <button onClick={()=>handleBanUser(u.id,u.is_banned)} disabled={u.id === currentUser.id} className={`text-xs border px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-200 dark:hover:bg-slate-600'}`}>{u.is_banned?'Unlock':'Ban'}</button>
+                                <button onClick={()=>handleDeleteUser(u.id)} disabled={u.id === currentUser.id} className={`text-xs border border-red-200 text-red-600 px-2 py-1 rounded ${u.id===currentUser.id ? 'opacity-50 cursor-not-allowed' : 'hover:bg-red-50'}`}><Trash2 size={14}/></button>
+                            </td>
+                        </tr>
+                    ))}
+                  </tbody>
                 </table>
+                <PaginationControls totalItems={users.length} />
               </div>
             )}
             
-            {/* ⚠️ REPORTS TAB */}
+            {/* ⚠️ REPORTS TAB (พร้อม Pagination) */}
             {activeTab === 'reports' && (
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-x-auto border dark:border-slate-700 animate-in fade-in">
-                    <table className="w-full text-left min-w-[800px]">
-                        <thead className="bg-yellow-50 dark:bg-slate-700 text-gray-700 dark:text-white">
-                            <tr><th className="p-4 w-1/4">Topic</th><th className="p-4 w-1/4">User</th><th className="p-4">Status</th><th className="p-4">Action</th></tr>
-                        </thead>
-                        <tbody className="divide-y dark:divide-slate-700">
-                            {reports.map(r=>(
-                                <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-750">
-                                    <td className="p-4">
-                                        <div className="font-bold dark:text-white">{r.topic}</div>
-                                        <div className="text-sm text-gray-500 truncate max-w-xs">{r.description}</div>
-                                        {r.admin_reply && <div className="text-xs text-blue-600 mt-1 flex items-center gap-1"><MessageCircle size={10}/> Replied</div>}
-                                    </td>
-                                    <td className="p-4 text-sm dark:text-gray-300">{r.first_name}<br/><span className="text-xs text-gray-500">{r.email}</span></td>
-                                    <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${r.status==='resolved'?'bg-green-100 text-green-700':r.status==='pending'?'bg-yellow-100 text-yellow-700':'bg-gray-200'}`}>{r.status}</span></td>
-                                    <td className="p-4">
-                                        <div className="flex gap-2">
-                                            <button onClick={()=>handleOpenReply(r)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-1"><MessageCircle size={14}/> Reply</button>
-                                            <select onChange={(e)=>handleUpdateReport(r.id,e.target.value)} value={r.status} className="border rounded text-xs p-1 dark:bg-slate-600 dark:text-white"><option value="pending">Pending</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="space-y-4 animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-x-auto border dark:border-slate-700">
+                        <table className="w-full text-left min-w-[800px]">
+                            <thead className="bg-yellow-50 dark:bg-slate-700 text-gray-700 dark:text-white">
+                                <tr><th className="p-4 w-1/4">Topic</th><th className="p-4 w-1/4">User</th><th className="p-4">Status</th><th className="p-4">Action</th></tr>
+                            </thead>
+                            <tbody className="divide-y dark:divide-slate-700">
+                                {paginateData(reports).map(r=>(
+                                    <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-slate-750">
+                                        <td className="p-4">
+                                            <div className="font-bold dark:text-white">{r.topic}</div>
+                                            <div className="text-sm text-gray-500 truncate max-w-xs">{r.description}</div>
+                                            {r.admin_reply && <div className="text-xs text-blue-600 mt-1 flex items-center gap-1"><MessageCircle size={10}/> Replied</div>}
+                                        </td>
+                                        <td className="p-4 text-sm dark:text-gray-300">{r.first_name}<br/><span className="text-xs text-gray-500">{r.email}</span></td>
+                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${r.status==='resolved'?'bg-green-100 text-green-700':r.status==='pending'?'bg-yellow-100 text-yellow-700':'bg-gray-200'}`}>{r.status}</span></td>
+                                        <td className="p-4">
+                                            <div className="flex gap-2">
+                                                <button onClick={()=>handleOpenReply(r)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 flex items-center gap-1"><MessageCircle size={14}/> Reply</button>
+                                                <select onChange={(e)=>handleUpdateReport(r.id,e.target.value)} value={r.status} className="border rounded text-xs p-1 dark:bg-slate-600 dark:text-white"><option value="pending">Pending</option><option value="resolved">Resolved</option><option value="closed">Closed</option></select>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <PaginationControls totalItems={reports.length} />
                 </div>
             )}
         </main>
