@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { Calendar, Eye, ArrowRight, ImageOff, MessageSquareWarning, History, Moon, Sun, Globe, X } from 'lucide-react';
-import { useConfig } from '../context/ConfigContext'; // ✅ เรียกใช้ Context
+import { Calendar, Eye, ArrowRight, ImageOff, MessageSquareWarning, History, Moon, Sun, Globe, X, Search } from 'lucide-react';
+import { useConfig } from '../context/ConfigContext'; 
 
 export default function Home() {
   const navigate = useNavigate();
@@ -12,6 +12,7 @@ export default function Home() {
   const [newsList, setNewsList] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // ✅ 1. เพิ่ม State สำหรับเก็บคำค้นหา
   const [myReports, setMyReports] = useState([]);
   const [showReportModal, setShowReportModal] = useState(false);
   
@@ -68,7 +69,17 @@ export default function Home() {
     }
   };
 
-  const filteredNews = selectedCategory === 'all' ? newsList : newsList.filter(n => n.category_id === parseInt(selectedCategory));
+  // ✅ 2. อัปเกรด Logic การกรองข่าว (กรองทั้งหมวดหมู่ และ คำค้นหา พร้อมกัน)
+  const filteredNews = newsList.filter(n => {
+      // เงื่อนไขที่ 1: เช็คหมวดหมู่
+      const matchesCategory = selectedCategory === 'all' || n.category_id === parseInt(selectedCategory);
+      
+      // เงื่อนไขที่ 2: เช็คคำค้นหา (ค้นหาจาก Title)
+      const matchesSearch = n.title.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // ต้องผ่านทั้ง 2 เงื่อนไขถึงจะแสดง
+      return matchesCategory && matchesSearch;
+  });
 
   return (
     <div className="font-sarabun min-h-screen pb-20 bg-gray-50 dark:bg-slate-900 transition-colors duration-300">
@@ -91,6 +102,21 @@ export default function Home() {
       </div>
 
       <div className="container mx-auto p-4 space-y-6">
+        
+        {/* ✅ 3. เพิ่มช่องค้นหา (Search Bar) */}
+        <div className="relative max-w-md mx-auto md:mx-0">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <Search size={20} />
+            </div>
+            <input 
+                type="text"
+                placeholder={t('search') || "ค้นหาหัวข้อข่าว..."}
+                className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+            />
+        </div>
+
         {/* Filters */}
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
             <button onClick={()=>setSelectedCategory('all')} className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory==='all'?'bg-blue-600 text-white shadow-lg transform scale-105':'bg-white dark:bg-slate-800 dark:text-white hover:bg-gray-100'}`}>{t('all')}</button>
@@ -99,26 +125,32 @@ export default function Home() {
 
         {/* News Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredNews.map(n => (
-                <div key={n.id} className="group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-2xl overflow-hidden flex flex-col h-full border border-gray-100 dark:border-slate-700 transition-all duration-300 transform hover:-translate-y-1">
-                    <div className="relative w-full h-64 bg-gray-100 dark:bg-slate-700 overflow-hidden flex items-center justify-center">
-                        {n.image_url ? 
-                           <img src={n.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/> : 
-                           <div className="flex flex-col items-center justify-center text-gray-400"><ImageOff size={40}/><span className="text-xs mt-2">No Image</span></div>
-                        }
-                        <span className="absolute top-3 right-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur text-blue-600 text-xs px-3 py-1 rounded-full shadow-sm font-bold z-10">{n.category_name}</span>
-                    </div>
-                    <div className="p-6 flex-1 flex flex-col">
-                        <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
-                            <span className="flex gap-1 items-center"><Calendar size={14}/> {new Date(n.created_at).toLocaleDateString(lang==='th'?'th-TH':'en-US')}</span>
-                            <span className="flex gap-1 items-center"><Eye size={14}/> {n.view_count}</span>
+            {filteredNews.length > 0 ? (
+                filteredNews.map(n => (
+                    <div key={n.id} className="group bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:shadow-2xl overflow-hidden flex flex-col h-full border border-gray-100 dark:border-slate-700 transition-all duration-300 transform hover:-translate-y-1">
+                        <div className="relative w-full h-64 bg-gray-100 dark:bg-slate-700 overflow-hidden flex items-center justify-center">
+                            {n.image_url ? 
+                            <img src={n.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/> : 
+                            <div className="flex flex-col items-center justify-center text-gray-400"><ImageOff size={40}/><span className="text-xs mt-2">No Image</span></div>
+                            }
+                            <span className="absolute top-3 right-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur text-blue-600 text-xs px-3 py-1 rounded-full shadow-sm font-bold z-10">{n.category_name}</span>
                         </div>
-                        <h3 className="text-xl font-bold dark:text-white line-clamp-2 mb-3 group-hover:text-blue-600 transition-colors">{n.title}</h3>
-                        <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 mb-5 flex-1 opacity-80 leading-relaxed">{stripHtml(n.content)}</p>
-                        <button onClick={()=>handleReadNews(n.id)} className="w-full mt-auto flex justify-center items-center gap-2 bg-gray-50 dark:bg-slate-700 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-300 py-3 rounded-xl transition-all font-bold text-sm shadow-sm hover:shadow">{t('readMore')} <ArrowRight size={16}/></button>
+                        <div className="p-6 flex-1 flex flex-col">
+                            <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                <span className="flex gap-1 items-center"><Calendar size={14}/> {new Date(n.created_at).toLocaleDateString(lang==='th'?'th-TH':'en-US')}</span>
+                                <span className="flex gap-1 items-center"><Eye size={14}/> {n.view_count}</span>
+                            </div>
+                            <h3 className="text-xl font-bold dark:text-white line-clamp-2 mb-3 group-hover:text-blue-600 transition-colors">{n.title}</h3>
+                            <p className="text-gray-600 dark:text-gray-300 text-sm line-clamp-2 mb-5 flex-1 opacity-80 leading-relaxed">{stripHtml(n.content)}</p>
+                            <button onClick={()=>handleReadNews(n.id)} className="w-full mt-auto flex justify-center items-center gap-2 bg-gray-50 dark:bg-slate-700 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-blue-300 py-3 rounded-xl transition-all font-bold text-sm shadow-sm hover:shadow">{t('readMore')} <ArrowRight size={16}/></button>
+                        </div>
                     </div>
+                ))
+            ) : (
+                <div className="col-span-full text-center py-20 text-gray-400">
+                    <p className="text-lg">ไม่พบข่าวที่คุณค้นหา</p>
                 </div>
-            ))}
+            )}
         </div>
       </div>
 
